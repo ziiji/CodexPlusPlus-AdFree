@@ -69,10 +69,10 @@ def test_renderer_script_keeps_sponsors_separate_from_author_support():
 def test_renderer_script_configures_sponsor_ad_and_coffee_tabs():
     text = Path("codex_session_delete/inject/renderer-inject.js").read_text(encoding="utf-8")
 
-    assert 'data-codex-plus-tab="sponsor" data-active="false">广告</button>' in text
+    assert 'data-codex-plus-tab="sponsor" data-active="false">推荐内容</button>' in text
     assert 'data-codex-plus-tab="support" data-active="false">请作者喝咖啡</button>' in text
-    assert "赞助商广告" in text[text.index('data-codex-plus-panel="sponsor"'):text.index('data-codex-plus-panel="support"')]
-    assert "普通广告" in text[text.index('data-codex-plus-panel="sponsor"'):text.index('data-codex-plus-panel="support"')]
+    assert "赞助商推荐" in text[text.index('data-codex-plus-panel="sponsor"'):text.index('data-codex-plus-panel="support"')]
+    assert "普通推荐" in text[text.index('data-codex-plus-panel="sponsor"'):text.index('data-codex-plus-panel="support"')]
     assert 'data-codex-plus-active-tab="sponsor"' not in text
     assert '.codex-plus-modal-content[data-codex-plus-active-tab="support"] { width: min(820px, calc(100vw - 48px)); }' in text
     assert "codex-plus-ad-image" not in text
@@ -80,10 +80,39 @@ def test_renderer_script_configures_sponsor_ad_and_coffee_tabs():
 
 
 
+def test_renderer_script_uses_recommendation_copy_for_ad_page():
+    text = Path("codex_session_delete/inject/renderer-inject.js").read_text(encoding="utf-8")
+    sponsor_panel = text[text.index('data-codex-plus-panel="sponsor"'):text.index('data-codex-plus-panel="support"')]
+
+    assert 'data-codex-plus-tab="sponsor" data-active="false">推荐内容</button>' in text
+    assert "赞助商推荐" in sponsor_panel
+    assert "普通推荐" in sponsor_panel
+    assert "广告分为" not in sponsor_panel
+
+
+
+def test_renderer_script_filters_expired_remote_ads():
+    text = Path("codex_session_delete/inject/renderer-inject.js").read_text(encoding="utf-8")
+
+    assert "expires_at" in text
+    assert "isCodexPlusAdExpired" in text
+    assert "Date.parse(ad.expires_at)" in text
+    assert "!isCodexPlusAdExpired(ad)" in text
+
+
+
+def test_renderer_script_loads_ads_through_helper_origin():
+    text = Path("codex_session_delete/inject/renderer-inject.js").read_text(encoding="utf-8")
+
+    assert "`${helperBase}/ads`" in text
+    assert "raw.githubusercontent.com/BigPizzaV3/Ad-List" not in text
+
+
+
 def test_renderer_script_loads_ads_from_remote_json_without_local_fallback():
     text = Path("codex_session_delete/inject/renderer-inject.js").read_text(encoding="utf-8")
 
-    assert "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json" in text
+    assert "`${helperBase}/ads`" in text
     assert "fetchCodexPlusAds" in text
     assert "codexPlusAds" in text
     assert "RawChat｜Codex 中转站" not in text
@@ -97,8 +126,8 @@ def test_renderer_script_renders_sponsor_and_normal_ad_groups():
     text = Path("codex_session_delete/inject/renderer-inject.js").read_text(encoding="utf-8")
     sponsor_panel = text[text.index('data-codex-plus-panel="sponsor"'):text.index('data-codex-plus-panel="support"')]
 
-    assert "赞助商广告" in sponsor_panel
-    assert "普通广告" in sponsor_panel
+    assert "赞助商推荐" in sponsor_panel
+    assert "普通推荐" in sponsor_panel
     assert "renderCodexPlusAdGroup(\"sponsor\"" in text
     assert "renderCodexPlusAdGroup(\"normal\"" in text
     assert "codex-plus-ad-empty" in text
@@ -563,7 +592,7 @@ def test_renderer_script_has_sponsor_tab():
 
     assert "data-codex-plus-tab=\"sponsor\"" in text
     assert "data-codex-plus-tab=\"support\"" in text
-    assert "赞助商广告" in text
+    assert "推荐内容" in text
     assert "请作者喝咖啡" in text
     assert "请我喝杯咖啡" in text
     assert "data-codex-plus-panel=\"sponsor\"" in text

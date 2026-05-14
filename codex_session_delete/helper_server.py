@@ -4,6 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from urllib.parse import unquote
+from urllib.request import Request, urlopen
 from typing import Protocol
 
 from codex_session_delete.models import DeleteResult, DeleteStatus, ExportResult, ExportStatus, SessionRef
@@ -32,11 +33,13 @@ class HelperServer(ThreadingHTTPServer):
         *,
         allow_http_mutation: bool = False,
         http_mutation_token: str | None = None,
+        ad_list_url: str = "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json",
     ):
         self.service = service
         self.export_service = export_service
         self.allow_http_mutation = allow_http_mutation
         self.http_mutation_token = http_mutation_token
+        self.ad_list_url = ad_list_url
         super().__init__((host, port), _Handler)
 
     @property
@@ -53,6 +56,9 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/health":
             self._send_json({"ok": True})
+            return
+        if self.path == "/ads":
+            self._send_ads()
             return
         if self.path.startswith("/assets/"):
             self._send_asset(self.path.removeprefix("/assets/"))
@@ -139,6 +145,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _send_ads(self) -> None:
+        request = Request(self.server.ad_list_url, headers={"User-Agent": "CodexPlusPlus"})
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        self._send_json(payload)
 
     def _send_asset(self, name: str) -> None:
         asset_name = unquote(name)

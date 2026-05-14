@@ -609,20 +609,27 @@
     }
   }
 
-  const codexPlusAdsUrl = "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json";
+  const codexPlusAdsUrl = `${helperBase}/ads`;
   let codexPlusAds = [];
   let codexPlusAdsLoaded = false;
+
+  function isCodexPlusAdExpired(ad) {
+    if (!ad.expires_at) return false;
+    const expiresAt = Date.parse(ad.expires_at);
+    return Number.isFinite(expiresAt) && expiresAt < Date.now();
+  }
 
   function normalizeCodexPlusAds(payload) {
     if (!payload || !Array.isArray(payload.ads)) return [];
     return payload.ads.filter((ad) => {
-      return ad && ["sponsor", "normal"].includes(ad.type) && ad.title && ad.description && ad.url;
+      return ad && ["sponsor", "normal"].includes(ad.type) && ad.title && ad.description && ad.url && !isCodexPlusAdExpired(ad);
     }).map((ad) => ({
       id: String(ad.id || ad.title),
       type: ad.type,
       title: String(ad.title),
       description: String(ad.description),
       url: String(ad.url),
+      expires_at: ad.expires_at ? String(ad.expires_at) : "",
       highlights: Array.isArray(ad.highlights) ? ad.highlights.map((item) => String(item)).filter(Boolean) : [],
     }));
   }
@@ -645,23 +652,23 @@
   }
 
   function renderCodexPlusAds() {
-    if (!codexPlusAdsLoaded) return `<div class="codex-plus-ad-empty">广告加载中…</div>`;
-    if (!codexPlusAds.length) return `<div class="codex-plus-ad-empty">广告暂时不可用。</div>`;
+    if (!codexPlusAdsLoaded) return `<div class="codex-plus-ad-empty">推荐内容加载中…</div>`;
+    if (!codexPlusAds.length) return `<div class="codex-plus-ad-empty">暂无推荐内容。</div>`;
     return `
       <section class="codex-plus-ad-section">
-        <h3 class="codex-plus-ad-section-title">赞助商广告</h3>
-        <div class="codex-plus-ad-list">${renderCodexPlusAdGroup("sponsor", "暂无赞助商广告。")}</div>
+        <h3 class="codex-plus-ad-section-title">赞助商推荐</h3>
+        <div class="codex-plus-ad-list">${renderCodexPlusAdGroup("sponsor", "暂无赞助商推荐。")}</div>
       </section>
       <section class="codex-plus-ad-section">
-        <h3 class="codex-plus-ad-section-title">普通广告</h3>
-        <div class="codex-plus-ad-list">${renderCodexPlusAdGroup("normal", "暂无普通广告。")}</div>
+        <h3 class="codex-plus-ad-section-title">普通推荐</h3>
+        <div class="codex-plus-ad-list">${renderCodexPlusAdGroup("normal", "暂无普通推荐。")}</div>
       </section>
     `;
   }
 
   async function fetchCodexPlusAds() {
     try {
-      const response = await fetch(`${codexPlusAdsUrl}?t=${Date.now()}`, { cache: "no-store" });
+      const response = await fetch(codexPlusAdsUrl, { cache: "no-store" });
       if (!response.ok) throw new Error(`ad list ${response.status}`);
       codexPlusAds = normalizeCodexPlusAds(await response.json());
     } catch (_) {
@@ -700,7 +707,7 @@
         <div class="codex-plus-tabs" role="tablist" aria-label="Codex++">
           <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="home" data-active="true">主页</button>
           <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="userScripts" data-active="false">用户脚本</button>
-          <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="sponsor" data-active="false">广告</button>
+          <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="sponsor" data-active="false">推荐内容</button>
           <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="support" data-active="false">请作者喝咖啡</button>
         </div>
         <div class="codex-plus-modal-body">
@@ -772,7 +779,7 @@
             </div>
           </div>
           <div class="codex-plus-panel" data-codex-plus-panel="sponsor" hidden>
-            <div class="codex-plus-sponsor-text">广告分为赞助商广告和普通广告。赞助商广告来自支持 Codex++ 继续维护的合作方；普通广告用于展示适合 Codex 用户的服务与信息。</div>
+            <div class="codex-plus-sponsor-text">推荐内容分为赞助商推荐和普通推荐。赞助商推荐来自支持 Codex++ 继续维护的合作方；普通推荐用于展示适合 Codex 用户的服务与信息。</div>
             <div class="codex-plus-ad-remote">
               ${renderCodexPlusAds()}
             </div>

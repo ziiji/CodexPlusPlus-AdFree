@@ -53,6 +53,28 @@ def post_json(url, payload, headers=None):
         return json.loads(response.read().decode("utf-8"))
 
 
+def test_helper_server_serves_remote_ad_list_from_helper_origin():
+    service = FakeDeleteService()
+    server = HelperServer("127.0.0.1", 0, service)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = urllib.request.Request(f"http://127.0.0.1:{server.port}/ads", method="GET")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            body = json.loads(response.read().decode("utf-8"))
+            content_type = response.headers.get("Content-Type")
+    finally:
+        server.shutdown()
+        thread.join(timeout=3)
+
+    assert content_type == "application/json"
+    assert body["version"] == 1
+    assert {ad["type"] for ad in body["ads"]} == {"sponsor", "normal"}
+    assert any(ad["url"] == "https://rawchat.cn" for ad in body["ads"])
+    assert any(ad["url"] == "https://0029.org" for ad in body["ads"])
+
+
+
 def test_helper_server_delete_and_undo():
     service = FakeDeleteService()
     server = HelperServer("127.0.0.1", 0, service, allow_http_mutation=True)
