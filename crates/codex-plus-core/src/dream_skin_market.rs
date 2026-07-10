@@ -131,8 +131,9 @@ pub async fn install_market_theme_from_base(
     let image_url = market_asset_url(raw_base_url, &theme.image)?;
     let theme_bytes = download_limited(&client, &theme_url, MARKET_THEME_LIMIT).await?;
     verify_sha256(&theme_bytes, &theme.theme_sha256, "主题配置")?;
-    let config: DreamSkinThemeConfig =
+    let mut config: DreamSkinThemeConfig =
         serde_json::from_slice(&theme_bytes).context("市场主题配置不是有效 JSON")?;
+    config.remove_promotional_fields();
     if config.id != theme.id || config.name != theme.name {
         bail!("市场主题配置与清单身份不一致");
     }
