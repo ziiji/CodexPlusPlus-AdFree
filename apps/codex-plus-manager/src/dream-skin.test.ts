@@ -53,7 +53,7 @@ describe("dream skin theme helpers", () => {
     assert.match(renderer, /__CODEX_PLUS_CLEAR_DREAM_SKIN__/);
   });
 
-  it("preserves target-only theme fields without rewriting them", () => {
+  it("preserves target-only theme fields while removing promotions", () => {
     const theme = normalizeDreamSkinTheme({
       schemaVersion: 1,
       id: "target-theme",
@@ -88,6 +88,9 @@ describe("dream skin theme helpers", () => {
       side: "right",
     });
     assert.deepEqual(theme.customTargetField, { nested: true });
+    assert.equal(theme.promoTitle, undefined);
+    assert.equal(theme.promoSub, undefined);
+    assert.equal(theme.promoUrl, undefined);
   });
 
   it("renders an optional image companion beside the visible composer", async () => {
