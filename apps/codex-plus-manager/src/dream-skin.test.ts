@@ -53,7 +53,7 @@ describe("dream skin theme helpers", () => {
     assert.match(renderer, /__CODEX_PLUS_CLEAR_DREAM_SKIN__/);
   });
 
-  it("preserves target-only theme fields without rewriting them", () => {
+  it("preserves target-only theme fields while removing promotions", () => {
     const theme = normalizeDreamSkinTheme({
       schemaVersion: 1,
       id: "target-theme",
@@ -78,6 +78,9 @@ describe("dream skin theme helpers", () => {
     assert.deepEqual(theme.art, { focusX: 0.72, focusY: 0.45, safeArea: "left", taskMode: "ambient" });
     assert.deepEqual(theme.palette, { accent: "#123456", custom: "keep" });
     assert.deepEqual(theme.customTargetField, { nested: true });
+    assert.equal(theme.promoTitle, undefined);
+    assert.equal(theme.promoSub, undefined);
+    assert.equal(theme.promoUrl, undefined);
   });
 
   it("detects text, color, and image draft changes", () => {

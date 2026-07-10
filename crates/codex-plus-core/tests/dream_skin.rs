@@ -23,13 +23,15 @@ fn backend_settings_defaults_to_upstream_platform_theme_config() {
         assert_eq!(theme.name, "Dream Skin");
         assert_eq!(theme.tagline, "把喜欢的画面变成可交互的 Codex 工作台。");
         assert_eq!(theme.colors.as_ref().unwrap().accent, "#E25563");
-        assert_eq!(theme.extra_fields["promoSub"], "passion8.cc");
+        assert!(!theme.extra_fields.contains_key("promoTitle"));
+        assert!(!theme.extra_fields.contains_key("promoSub"));
+        assert!(!theme.extra_fields.contains_key("promoUrl"));
     }
     assert!(!settings.codex_app_dream_skin_paused);
 }
 
 #[test]
-fn target_theme_fields_survive_deserialize_and_serialize() {
+fn target_theme_fields_survive_while_promotions_are_removed() {
     let source = serde_json::json!({
         "schemaVersion": 1,
         "id": "target-theme",
@@ -56,19 +58,14 @@ fn target_theme_fields_survive_deserialize_and_serialize() {
     });
 
     let theme: DreamSkinThemeConfig = serde_json::from_value(source.clone()).unwrap();
+    let theme = theme.without_promotional_fields();
     let saved = serde_json::to_value(theme).unwrap();
 
-    for key in [
-        "image",
-        "appearance",
-        "art",
-        "palette",
-        "promoTitle",
-        "promoSub",
-        "promoUrl",
-        "customTargetField",
-    ] {
+    for key in ["image", "appearance", "art", "palette", "customTargetField"] {
         assert_eq!(saved[key], source[key], "target field changed: {key}");
+    }
+    for key in ["promoTitle", "promoSub", "promoUrl"] {
+        assert!(saved.get(key).is_none(), "promotional field remains: {key}");
     }
     assert!(saved.get("colors").is_none());
     assert!(saved.get("stylePreset").is_none());
