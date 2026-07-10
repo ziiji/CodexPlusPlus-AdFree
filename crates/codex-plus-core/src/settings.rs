@@ -256,6 +256,20 @@ pub struct DreamSkinThemeConfig {
     pub extra_fields: Map<String, Value>,
 }
 
+impl DreamSkinThemeConfig {
+    pub fn remove_promotional_fields(&mut self) {
+        for key in ["promoTitle", "promoSub", "promoUrl"] {
+            self.extra_fields.remove(key);
+        }
+    }
+
+    pub fn without_promotional_fields(&self) -> Self {
+        let mut config = self.clone();
+        config.remove_promotional_fields();
+        config
+    }
+}
+
 impl Default for DreamSkinThemeConfig {
     fn default() -> Self {
         let mut extra_fields = Map::new();
@@ -281,18 +295,6 @@ impl Default for DreamSkinThemeConfig {
             extra_fields.insert(
                 "image".to_string(),
                 Value::String("portal-hero.png".to_string()),
-            );
-            extra_fields.insert(
-                "promoTitle".to_string(),
-                Value::String("感谢 Passion8 赞助".to_string()),
-            );
-            extra_fields.insert(
-                "promoSub".to_string(),
-                Value::String("passion8.cc".to_string()),
-            );
-            extra_fields.insert(
-                "promoUrl".to_string(),
-                Value::String("https://passion8.cc/register?aff=TuPe".to_string()),
             );
         }
         Self {
@@ -1192,9 +1194,12 @@ fn merge_known_setting_fields(target: &mut Map<String, Value>, source: &Map<Stri
         );
     }
     if let Some(value) = source.get("codexAppDreamSkinThemeConfig")
-        && serde_json::from_value::<DreamSkinThemeConfig>(value.clone()).is_ok()
+        && let Ok(mut config) = serde_json::from_value::<DreamSkinThemeConfig>(value.clone())
     {
-        target.insert("codexAppDreamSkinThemeConfig".to_string(), value.clone());
+        config.remove_promotional_fields();
+        if let Ok(value) = serde_json::to_value(config) {
+            target.insert("codexAppDreamSkinThemeConfig".to_string(), value);
+        }
     }
     if let Some(value) = source
         .get("codexAppDreamSkinImagePath")
@@ -1403,6 +1408,9 @@ fn normalize_settings_config_sections(mut settings: BackendSettings) -> BackendS
     {
         settings.codex_app_dream_skin_theme_config.id = settings.codex_app_dream_skin_theme.clone();
     }
+    settings
+        .codex_app_dream_skin_theme_config
+        .remove_promotional_fields();
     settings.codex_app_dream_skin_image_path =
         settings.codex_app_dream_skin_image_path.trim().to_string();
     settings.codex_app_stepwise_base_url = settings
