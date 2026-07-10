@@ -8,14 +8,15 @@ use codex_plus_core::ads::{
 use serde_json::json;
 
 #[test]
-fn default_ad_urls_match_legacy_helper_sources() {
-    assert_eq!(
-        DEFAULT_AD_LIST_URLS,
-        [
-            "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json",
-            "https://cdn.jsdelivr.net/gh/BigPizzaV3/Ad-List@main/ads.json",
-        ]
-    );
+fn default_ad_urls_are_empty_for_ad_free_build() {
+    assert!(DEFAULT_AD_LIST_URLS.is_empty());
+}
+
+#[tokio::test]
+async fn fetch_ad_list_with_no_urls_returns_empty_payload() {
+    let payload = fetch_ad_list_from_urls::<&str>(&[]).await.unwrap();
+
+    assert_eq!(payload, json!({"version": 1, "ads": []}));
 }
 
 #[test]
@@ -35,7 +36,7 @@ fn cache_busted_ad_url_preserves_existing_query() {
 }
 
 #[test]
-fn normalizes_remote_ads_for_plugin_and_manager_rendering() {
+fn normalizes_remote_ads_without_adding_promotions() {
     let payload = normalize_ad_payload(json!({
         "version": 1,
         "ads": [
@@ -65,17 +66,13 @@ fn normalizes_remote_ads_for_plugin_and_manager_rendering() {
     }));
 
     assert_eq!(payload["version"], json!(1));
-    assert_eq!(payload["ads"].as_array().unwrap().len(), 4);
-    assert_eq!(payload["ads"][0]["type"], json!("sponsor"));
-    assert_eq!(payload["ads"][1]["id"], json!("cubence"));
-    assert_eq!(payload["ads"][1]["type"], json!("sponsor"));
-    assert_eq!(payload["ads"][2]["id"], json!("ergou-api"));
-    assert_eq!(payload["ads"][2]["type"], json!("sponsor"));
-    assert_eq!(payload["ads"][3]["type"], json!("normal"));
+    assert_eq!(payload["ads"].as_array().unwrap().len(), 2);
+    assert_eq!(payload["ads"][0]["id"], json!("sponsor"));
+    assert_eq!(payload["ads"][1]["id"], json!("normal"));
 }
 
 #[test]
-fn builtin_sponsors_are_appended_after_remote_sponsors_with_ergou_last() {
+fn builtin_sponsors_are_not_appended_for_ad_free_build() {
     let payload = normalize_ad_payload(json!({
         "version": 1,
         "ads": [
@@ -97,38 +94,13 @@ fn builtin_sponsors_are_appended_after_remote_sponsors_with_ergou_last() {
     }));
     let ads = payload["ads"].as_array().unwrap();
 
+    assert_eq!(ads.len(), 2);
     assert_eq!(ads[0]["id"], json!("remote-sponsor"));
-    assert_eq!(ads[1]["id"], json!("cubence"));
-    assert_eq!(ads[1]["title"], json!("Cubence"));
-    assert_eq!(
-        ads[1]["url"],
-        json!("https://cubence.com?source=codexplusplus")
-    );
-    assert_eq!(ads[1]["expires_at"], json!("2026-08-02T23:59:59+08:00"));
-    assert!(
-        ads[1]["image"]
-            .as_str()
-            .unwrap()
-            .starts_with("data:image/png;base64,")
-    );
-    assert_eq!(ads[2]["id"], json!("ergou-api"));
-    assert_eq!(ads[2]["title"], json!("二狗 API"));
-    assert_eq!(
-        ads[2]["url"],
-        json!("https://ergouapi.com/r/gh-codexplusplus")
-    );
-    assert_eq!(ads[2]["expires_at"], json!("2026-08-02T23:59:59+08:00"));
-    assert!(
-        ads[2]["image"]
-            .as_str()
-            .unwrap()
-            .starts_with("data:image/png;base64,")
-    );
-    assert_eq!(ads[3]["id"], json!("remote-normal"));
+    assert_eq!(ads[1]["id"], json!("remote-normal"));
 }
 
 #[test]
-fn normalizes_known_remote_sponsors_with_local_logos() {
+fn known_remote_sponsors_do_not_gain_bundled_logos() {
     let payload = normalize_ad_payload(json!({
         "version": 1,
         "ads": [
@@ -138,41 +110,6 @@ fn normalizes_known_remote_sponsors_with_local_logos() {
                 "title": "火山方舟",
                 "description": "远端推荐内容",
                 "url": "https://example.test/volcengine"
-            },
-            {
-                "id": "0029-token-bridge",
-                "type": "sponsor",
-                "title": "PackyCode",
-                "description": "远端推荐内容",
-                "url": "https://example.test/0029"
-            },
-            {
-                "id": "0055-token-bridge",
-                "type": "sponsor",
-                "title": "Token 云桥",
-                "description": "远端推荐内容",
-                "url": "https://example.test/0055"
-            },
-            {
-                "id": "apikey-fun-ai-relay",
-                "type": "sponsor",
-                "title": "APIKEY.FUN",
-                "description": "远端推荐内容",
-                "url": "https://example.test/apikey"
-            },
-            {
-                "id": "rawchat-codex-relay",
-                "type": "sponsor",
-                "title": "RawChat",
-                "description": "远端推荐内容",
-                "url": "https://example.test/rawchat"
-            },
-            {
-                "id": "runapi-openrouter-alternative",
-                "type": "sponsor",
-                "title": "RunAPI",
-                "description": "远端推荐内容",
-                "url": "https://example.test/runapi"
             },
             {
                 "id": "jojocode-codex-relay",
@@ -186,36 +123,8 @@ fn normalizes_known_remote_sponsors_with_local_logos() {
     }));
     let ads = payload["ads"].as_array().unwrap();
 
-    for id in [
-        "volcengine-ark-agent-plan",
-        "0029-token-bridge",
-        "apikey-fun-ai-relay",
-        "runapi-openrouter-alternative",
-    ] {
-        let ad = ads.iter().find(|ad| ad["id"] == json!(id)).unwrap();
-        assert!(
-            ad["image"]
-                .as_str()
-                .unwrap()
-                .starts_with("data:image/png;base64,"),
-            "{id}"
-        );
-    }
-    for id in ["0055-token-bridge", "rawchat-codex-relay"] {
-        let ad = ads.iter().find(|ad| ad["id"] == json!(id)).unwrap();
-        assert!(
-            ad["image"]
-                .as_str()
-                .unwrap()
-                .starts_with("data:image/svg+xml;base64,"),
-            "{id}"
-        );
-    }
-    let jojocode = ads
-        .iter()
-        .find(|ad| ad["id"] == json!("jojocode-codex-relay"))
-        .unwrap();
-    assert_eq!(jojocode["image"], json!("https://example.test/logo.png"));
+    assert!(ads[0].get("image").is_none());
+    assert_eq!(ads[1]["image"], json!("https://example.test/logo.png"));
 }
 
 #[tokio::test]
@@ -264,7 +173,5 @@ async fn fetch_ad_list_tries_backup_url_when_primary_fails() {
     .unwrap();
     thread.join().unwrap();
 
-    let ads = payload["ads"].as_array().unwrap();
-    assert!(ads.iter().any(|ad| ad["id"] == json!("ergou-api")));
-    assert!(ads.iter().any(|ad| ad["id"] == json!("backup-ad")));
+    assert_eq!(payload["ads"][0]["id"], json!("backup-ad"));
 }
