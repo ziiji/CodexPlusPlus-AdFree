@@ -68,35 +68,35 @@ fn bundled_target_renderers_and_styles_remain_byte_exact() {
     for (path, hash) in [
         (
             "assets/inject/upstream/dream-skin/windows/renderer-inject.js",
-            "D9383160DB0A71CE8219A845D3C300AFDDC874932B533FE3550DA723125E38A5",
+            "74D3BFB0F0F55C138EE3B0933F7B55BC11F71D09F1B07794BCA51B6598DE203D",
         ),
         (
             "assets/inject/upstream/dream-skin/windows/dream-skin.css",
-            "99DD5DA043DCE71766E4C01BECA22A123284BA5DCD72D75AA9D36B4549B7D542",
+            "12848DA7DDAACF1B0F18CD419B2B27A6355DCBCE01AF650F1BCE14D99FEBD532",
         ),
         (
             "assets/inject/upstream/dream-skin/macos/renderer-inject.js",
-            "806D23E953CE356DA621E164467141E7CA8B28235562F4252386FDABF952A5B5",
+            "2704C39506C66554C3529BF0D15B876B4AEC2DD9A36B1796AB43E19C33A046FC",
         ),
         (
             "assets/inject/upstream/dream-skin/macos/dream-skin.css",
-            "BBC44EBE8EEAA6A8F25BB00559C30294816FB185A86CD2BD425E061BFF57E05F",
+            "EC3C3BC5F6E10E20A3F2307796BD1E1350E80E5D23D37318EE5468833C95A6DF",
         ),
         (
             "assets/inject/upstream/cidala-tiger/windows/renderer-inject.js",
-            "97C1F062F6695C19469E851390974121F29C66B690C4790E761C0E1F82586EF1",
+            "0BFB5F66A0323BF1392B42033E66904DE3EC4BFC8A5BA297F2BB92A4A6740A34",
         ),
         (
             "assets/inject/upstream/cidala-tiger/windows/dream-skin.css",
-            "82ECECF50F3595B80BD148D55246FA2871E3F3D0A2C9031F5BAD8B5E6413E666",
+            "482A60AF98DD6B460BF624C56918C5B57F9CCD5B55E52FA46D486F7D65259D9A",
         ),
         (
             "assets/inject/upstream/cidala-tiger/macos/renderer-inject.js",
-            "09F5BF89BFD8DA90E0E3FD74CA840AD417B63BDF6E5DFDBCB720FD1A6B1FF54E",
+            "21FAF1DC0A3EBE78D8D972182CACE62BD93D5D0E5841725398A4A524EF2BC20B",
         ),
         (
             "assets/inject/upstream/cidala-tiger/macos/dream-skin.css",
-            "662B04F2E74570770394E3D6F012F6B5952C50E55A1AD47B1577161F860D775D",
+            "5E149E9A13985961C5F3125296178ACB2ABF0B528974F1E616AA625970430562",
         ),
         (
             "assets/inject/upstream/snow-skin/renderer-inject.js",
@@ -108,11 +108,11 @@ fn bundled_target_renderers_and_styles_remain_byte_exact() {
         ),
         (
             "assets/inject/upstream/glass-vision/renderer-inject.js",
-            "57A529C0F5743CC7068B5F9064AAB098137520A051E5B0C5A45AD2DFAB91E98C",
+            "D14943E95DB62DB81BF29D9CF14FCAF1DD1EA9A9625245C020865127EEA295A2",
         ),
         (
             "assets/inject/upstream/glass-vision/glass-vision.css",
-            "84D4AF19D9D5B7D5934139892F83CDB58B5EB370598D775A54587C285A2C8BC1",
+            "4C37C53544EE4F1CD93BA5D0DC3E174B05D4CB84EC9A436295D11D19F0BB04F1",
         ),
     ] {
         assert_sha256(path, hash);

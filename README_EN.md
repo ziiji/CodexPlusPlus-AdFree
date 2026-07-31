@@ -40,7 +40,7 @@ The Windows installer is not commercially code-signed, so Windows SmartScreen ma
 
 ## Update Policy
 
-Version numbers follow upstream releases. For example, upstream `v1.2.43` maps to this fork's `v1.2.43`. One ad-free build is published for each upstream version. The app checks the Release asset `latest.json` to discover and install updates.
+Version numbers follow upstream releases. For example, upstream `v1.2.44` maps to this fork's `v1.2.44`. One ad-free build is published for each upstream version. The app checks the Release asset `latest.json` to discover and install updates.
 
 Each sync runs ad-removal regression tests, frontend checks, Rust tests, a release build, and a final binary scan for advertising markers.
 
