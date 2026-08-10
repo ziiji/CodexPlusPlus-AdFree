@@ -40,7 +40,7 @@ Windows 安装包目前没有商业代码签名，首次运行时可能出现 Sm
 
 ## 更新策略
 
-本分支版本号跟随上游版本，例如上游 `v1.2.44` 对应本分支 `v1.2.44`。每个上游版本只发布一个去广告构建。软件通过 Release 中的 `latest.json` 检查和下载安装包。
+本分支版本号跟随上游版本，例如上游 `v1.2.45` 对应本分支 `v1.2.45`。每个上游版本只发布一个去广告构建。软件通过 Release 中的 `latest.json` 检查和下载安装包。
 
 上游更新后，本分支会重新执行去广告测试、前端检查、Rust 测试、release 构建和最终二进制广告关键词扫描。
 
@@ -65,7 +65,7 @@ New-Item -ItemType Directory -Force dist/windows/app | Out-Null
 Copy-Item target/release/codex-plus-plus.exe dist/windows/app/
 Copy-Item target/release/codex-plus-plus-manager.exe dist/windows/app/
 Push-Location scripts/installer/windows
-& "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/INPUTCHARSET" "UTF8" "/DVERSION=1.2.44" CodexPlusPlus.nsi
+& "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/INPUTCHARSET" "UTF8" "/DVERSION=1.2.45" CodexPlusPlus.nsi
 Pop-Location
 ```
 

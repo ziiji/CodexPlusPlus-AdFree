@@ -2,26 +2,26 @@
 
 ## Active Work
 
-Sync the ad-free fork from upstream `v1.2.43` to `v1.2.44`.
+Sync the ad-free fork from upstream `v1.2.44` to `v1.2.45`.
 
 - Upstream: `BigPizzaV3/CodexPlusPlus`
 - Fork: `ziiji/CodexPlusPlus-AdFree`
-- Upstream tag: `v1.2.44` (`77091ccaee4423f35a1b2c51c4ecd703e6201092`)
-- Release commit subject: `Publish v1.2.44 ad-free fork`
+- Upstream tag: `v1.2.45` (`055302664af09e6e3bb76a00b36d318132094ee3`)
+- Release commit subject: `Publish v1.2.45 ad-free fork`
 
 ## Completed
 
-- Rebuilt the official `v1.2.44` source tree from the GitHub tag archive.
-- Reapplied the `v1.2.43` ad-free patch and resolved conflicts in:
+- Merged the official `v1.2.45` source tree from the GitHub tag archive.
+- Reapplied the `v1.2.44` ad-free patch and resolved conflicts in:
   - `README.md`
   - `README_EN.md`
   - `crates/codex-plus-core/src/ads.rs`
   - `crates/codex-plus-core/tests/ads.rs`
   - `crates/codex-plus-core/tests/upstream_theme_assets.rs`
-- Updated all release-facing version references to `1.2.44`.
+- Updated all release-facing version references to `1.2.45`.
 - Preserved the fork update channel at `ziiji/CodexPlusPlus-AdFree`.
 - Kept the default ad source list empty and removed the new bundled upstream sponsors.
-- Preserved the upstream `v1.2.44` feature changes, including the renderer and launcher fixes.
+- Preserved the upstream `v1.2.45` feature changes, including the native new-thread flow, VLM bridge fixes, installer progress handling, and renderer updates.
 - Kept provider presets that users explicitly select; they are not rendered automatically as ads.
 
 ## Verification
@@ -56,7 +56,7 @@ NSIS 3.12
 ## Next Steps
 
 1. Build the NSIS installer and release metadata.
-2. Publish the `v1.2.44` installers, `latest.json`, and SHA-256 files.
-3. Tag the final release commit as `v1.2.44` and push `main` plus the tag to the fork.
+2. Publish the `v1.2.45` installers, `latest.json`, and SHA-256 files.
+3. Tag the final release commit as `v1.2.45` and push `main` plus the tag to the fork.
 
 Unused sponsor images remain in the source history but have no code or documentation references and are not embedded in the executable. Do not bulk-delete them unless repository-level asset removal is explicitly desired.
