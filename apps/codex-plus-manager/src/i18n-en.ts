@@ -818,6 +818,33 @@ export const EN_PLAIN: Record<string, string> = {
   "保存前可先尝试从 /v1/sub2api/billing 获取上游倍率。":
     "Before saving, you can try fetching the upstream multiplier from /v1/sub2api/billing.",
   "非 Sub2API 供应商不会请求或显示倍率。": "Non-Sub2API providers won't request or display a multiplier.",
+  "DreamSkin 社区": "DreamSkin community",
+  "DreamSkin 社区主题": "DreamSkin community themes",
+  "导入 DreamSkin 主题包": "Import DreamSkin theme package",
+  "导入主题包": "Import theme package",
+  "从 DreamSkin.cc 加载已审核主题包。": "Load reviewed theme packages from DreamSkin.cc.",
+  "刷新社区": "Refresh community",
+  "在线主题库": "Online theme gallery",
+  "在线 Studio": "Online Studio",
+  "搜索社区主题": "Search community themes",
+  "搜索主题名称、作者或许可证": "Search theme names, authors or licenses",
+  "最新审核": "Recently reviewed",
+  "下载最多": "Most downloaded",
+  "名称排序": "Sort by name",
+  "社区主题排序": "Community theme sorting",
+  "正在加载 DreamSkin 社区…": "Loading DreamSkin community…",
+  "没有匹配的社区主题。": "No community themes match.",
+  "DreamSkin 社区暂时没有可用主题。": "No DreamSkin community themes are currently available.",
+  "下载、校验并安装主题包": "Download, verify and install the theme package",
+  "此主题仅支持在线预览或下载": "This theme only supports online preview or download",
+  "预览": "Preview",
+  "从 DreamSkin.cc 安装主题": "Install a theme from DreamSkin.cc",
+  "检测到网页一键换肤请求。确认后会从固定社区 API 下载，并在本机重新校验大小、SHA-256、ZIP 清单与 Safe CSS。":
+    "A one-click web theme request was detected. After confirmation, the package is downloaded from the fixed community API and its size, SHA-256, ZIP manifest and Safe CSS are verified locally.",
+  "主题版本 ID": "Theme version ID",
+  "链接不能携带任意下载地址、文件路径或命令；安装后主题会进入“我的主题”，不会自动重启 Codex。":
+    "The link cannot carry arbitrary download URLs, file paths or commands. After installation, the theme is added to My themes and Codex is not restarted automatically.",
+  "下载并安装": "Download and install",
   "安全提示：网页链接中的自定义 config.toml 和 auth.json 不会执行；管理工具只会使用上方字段生成受管配置。":
     "Security notice: Custom config.toml and auth.json in web links are never executed; the manager only uses the fields above to generate managed configuration.",
   "Sub2API 倍率未获取": "Sub2API multiplier unavailable",
@@ -889,6 +916,10 @@ export const EN_TEMPLATE: Record<string, string> = {
   "进程状态：{0}。是否要重新启动？": "Process status: {0}. Restart?",
   "选择会话 {0}": "Select session {0}",
   "透明度 {0}%": "Opacity {0}%",
+  "来自 DreamSkin.cc 的已审核主题，共 {0} 套；安装前仍会在本机再次校验。":
+    "{0} reviewed themes from DreamSkin.cc; each package is verified again locally before installation.",
+  "作者：{0} · {1} · {2} 次下载": "Author: {0} · {1} · {2} downloads",
+  "主题包：{0}": "Theme package: {0}",
   "，跳过 {0} 个占用文件": ", skipped {0} locked file(s)",
 };
 

@@ -2,26 +2,22 @@
 
 ## Active Work
 
-Sync the ad-free fork from upstream `v1.2.44` to `v1.2.45`.
+Sync the ad-free fork from upstream `v1.2.45` to `v1.2.46`.
 
 - Upstream: `BigPizzaV3/CodexPlusPlus`
 - Fork: `ziiji/CodexPlusPlus-AdFree`
-- Upstream tag: `v1.2.45` (`055302664af09e6e3bb76a00b36d318132094ee3`)
-- Release commit subject: `Publish v1.2.45 ad-free fork`
+- Upstream tag: `v1.2.46` (`a30b550`)
+- Release commit subject: `Publish v1.2.46 ad-free fork`
 
 ## Completed
 
-- Merged the official `v1.2.45` source tree from the GitHub tag archive.
-- Reapplied the `v1.2.44` ad-free patch and resolved conflicts in:
-  - `README.md`
-  - `README_EN.md`
-  - `crates/codex-plus-core/src/ads.rs`
-  - `crates/codex-plus-core/tests/ads.rs`
-  - `crates/codex-plus-core/tests/upstream_theme_assets.rs`
-- Updated all release-facing version references to `1.2.45`.
+- Merged the official `v1.2.46` source tree and preserved the DreamSkin community theme market, package validation, and safe CSS checks.
+- Reapplied the existing ad-free patch after the merge; the only source conflict was resolved in `crates/codex-plus-core/src/assets.rs` so managed theme CSS remains available while promotional theme fields stay stripped.
+- Updated release-facing documentation to `1.2.46`.
 - Preserved the fork update channel at `ziiji/CodexPlusPlus-AdFree`.
 - Kept the default ad source list empty and removed the new bundled upstream sponsors.
 - Preserved the upstream `v1.2.45` feature changes, including the native new-thread flow, VLM bridge fixes, installer progress handling, and renderer updates.
+- Preserved the upstream `v1.2.46` DreamSkin community gallery, one-click installation flow, and local package safety verification.
 - Kept provider presets that users explicitly select; they are not rendered automatically as ads.
 
 ## Verification
@@ -56,7 +52,7 @@ NSIS 3.12
 ## Next Steps
 
 1. Build the NSIS installer and release metadata.
-2. Publish the `v1.2.45` installers, `latest.json`, and SHA-256 files.
-3. Tag the final release commit as `v1.2.45` and push `main` plus the tag to the fork.
+2. Publish the `v1.2.46` installers and `latest.json`.
+3. Tag the final release commit as `v1.2.46` and push `main` plus the tag to the fork.
 
 Unused sponsor images remain in the source history but have no code or documentation references and are not embedded in the executable. Do not bulk-delete them unless repository-level asset removal is explicitly desired.
