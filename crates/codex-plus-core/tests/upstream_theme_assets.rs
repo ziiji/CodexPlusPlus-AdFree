@@ -26,6 +26,55 @@ fn assert_sha256(relative_path: &str, expected: &str) {
     assert_eq!(actual, expected, "upstream asset changed: {relative_path}");
 }
 
+fn assert_text_sha256(relative_path: &str, expected: &str) {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative_path);
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "failed to read upstream theme asset {}: {error}",
+            path.display()
+        )
+    });
+    let normalized = text.replace("\r\n", "\n");
+    let actual = format!("{:X}", Sha256::digest(normalized.as_bytes()));
+    assert_eq!(actual, expected, "upstream asset changed: {relative_path}");
+}
+
+fn assert_no_promotional_fields(relative_path: &str) {
+    fn visit(value: &serde_json::Value, relative_path: &str) {
+        match value {
+            serde_json::Value::Object(fields) => {
+                for key in ["promoTitle", "promoSub", "promoUrl"] {
+                    assert!(
+                        !fields.contains_key(key),
+                        "promotional field {key} found in {relative_path}"
+                    );
+                }
+                for value in fields.values() {
+                    visit(value, relative_path);
+                }
+            }
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    visit(value, relative_path);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative_path);
+    let value: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&path)
+            .unwrap_or_else(|error| panic!("failed to read theme {}: {error}", path.display())),
+    )
+    .unwrap_or_else(|error| panic!("failed to parse theme {}: {error}", path.display()));
+    visit(&value, relative_path);
+}
+
 #[test]
 fn bundled_target_renderers_and_styles_remain_byte_exact() {
     for (path, hash) in [
@@ -83,36 +132,42 @@ fn bundled_target_renderers_and_styles_remain_byte_exact() {
 }
 
 #[test]
-fn bundled_skin_pack_theme_files_remain_byte_exact() {
+fn bundled_ad_free_theme_files_remain_content_exact() {
     for (path, hash) in [
         (
-            "caishen-lite",
-            "379CB601522E7A5C2FC906E3D8BD5C7C64385FBD2A428798F8D169DEB7026F2E",
+            "assets/inject/upstream/dream-skin/macos/theme.json",
+            "50FCD415B210BEC9FDA9CA6DED3660B3730877C94B9C72A14B7B3E452B5CB229",
         ),
         (
-            "caishen-max",
-            "0CFF815EC9582B88ECF4AD9E7562D7DFF32904FA8F09338811397960D62FD7D4",
+            "assets/inject/upstream/cidala-tiger/macos/theme.json",
+            "50FCD415B210BEC9FDA9CA6DED3660B3730877C94B9C72A14B7B3E452B5CB229",
         ),
         (
-            "caishen-readable",
-            "EB1FFD4F2F49137B4AEDDBED435513D42685C8ED9E97DF644C693FD7859CC62D",
+            "assets/inject/upstream/skin-packs/packs/caishen-lite/theme.json",
+            "CB58204AC17B5D73859193A6C7C1EE4CE33568DEE88582D5B9AC2CEB35E0B6D7",
         ),
         (
-            "export-night",
-            "C312329AABEE84B9A8443B08D4DB64863EC49DEEA3C7F7C942B57E4391B87B59",
+            "assets/inject/upstream/skin-packs/packs/caishen-max/theme.json",
+            "AF1E5844A8015EC6B8AF7ABCF28D002A1A3A5AF99F95F1D492A42175F096EF84",
         ),
         (
-            "global-founder-bright",
-            "EAFB018494225ABABD83AE0E7B940E3F565232CF8F30C53AAFA63E7652178810",
+            "assets/inject/upstream/skin-packs/packs/caishen-readable/theme.json",
+            "9EA843898488827C4A311644F69E2BBE8DF3C98F09E24C942EA2B68D8E98D299",
         ),
         (
-            "mythic-guardian-noir",
-            "2A57716D0161F7405D713912BCD0CD329038657518537F3EFDB5F7EE53DBAE3D",
+            "assets/inject/upstream/skin-packs/packs/export-night/theme.json",
+            "836738F5EF3C10142463671050D898E90F5B25C7E391FA7A4E0280C7FA391312",
+        ),
+        (
+            "assets/inject/upstream/skin-packs/packs/global-founder-bright/theme.json",
+            "0816234B0BC8AE64194B7327168F9C353998FC17E4A5178B8E9BF1984B1820BB",
+        ),
+        (
+            "assets/inject/upstream/skin-packs/packs/mythic-guardian-noir/theme.json",
+            "0D984F68A0B6841E72CE062E6E56830B4FA305E6B8A1808A97A2B21E9F6F0B38",
         ),
     ] {
-        assert_sha256(
-            &format!("assets/inject/upstream/skin-packs/packs/{path}/theme.json"),
-            hash,
-        );
+        assert_text_sha256(path, hash);
+        assert_no_promotional_fields(path);
     }
 }
