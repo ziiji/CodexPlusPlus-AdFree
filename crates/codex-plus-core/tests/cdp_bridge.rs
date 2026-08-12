@@ -55,7 +55,7 @@ fn screenshot_command_uses_png_from_surface() {
 }
 
 #[test]
-fn injection_script_prefixes_helper_url_and_metadata() {
+fn injection_script_prefixes_helper_url_and_metadata_without_promotions() {
     let script = assets::injection_script(57321);
 
     assert!(script.contains("!window.electronBridge"));
@@ -65,8 +65,14 @@ fn injection_script_prefixes_helper_url_and_metadata() {
     assert!(!script.contains("window.__CODEX_PLUS_SPONSOR_IMAGES__"));
     assert!(script.contains("window.__CODEX_PLUS_VERSION__"));
     assert!(script.contains(codex_plus_core::version::VERSION));
-    assert!(script.contains("https://discord.gg/y96kX7A76v"));
-    assert!(script.contains("data-codex-plus-discord"));
+    assert!(!script.contains("https://discord.gg/y96kX7A76v"));
+    assert!(!script.contains("https://t.me/CodexPlusPlus"));
+    assert!(!script.contains("data-codex-plus-discord"));
+    assert!(!script.contains("data-codex-plus-telegram"));
+    assert!(!script.contains("promoTitle"));
+    assert!(!script.contains("promoSub"));
+    assert!(!script.contains("promoUrl"));
+    assert!(!script.contains("Passion8"));
 }
 
 #[test]
@@ -656,16 +662,19 @@ fn injection_script_marks_diagnostic_build_and_reports_script_loaded() {
 }
 
 #[test]
-fn injection_script_fetches_ads_without_bridge() {
+fn injection_script_does_not_fetch_or_render_ads() {
     let script = assets::injection_script(57321);
 
-    assert!(script.contains("directFetchCodexPlusAds"));
-    assert!(script.contains("cacheBustCodexPlusAdUrl"));
-    assert!(script.contains("Date.now()"));
-    assert!(script.contains("BigPizzaV3/Ad-List"));
-    assert!(
-        !script.contains("codexPlusAds = normalizeCodexPlusAds(await postJson(\"/ads\", {}));")
-    );
+    assert!(!script.contains("directFetchCodexPlusAds"));
+    assert!(!script.contains("cacheBustCodexPlusAdUrl"));
+    assert!(!script.contains("BigPizzaV3/Ad-List"));
+    assert!(!script.contains("codexPlusAds"));
+    assert!(!script.contains("data-codex-plus-panel=\"sponsor\""));
+    assert!(!script.contains("data-codex-plus-panel=\"support\""));
+    assert!(!script.contains("data-codex-plus-tab=\"sponsor\""));
+    assert!(!script.contains("data-codex-plus-tab=\"support\""));
+    assert!(!script.contains("赞助商推荐"));
+    assert!(!script.contains("普通推荐"));
 }
 
 #[test]
@@ -2096,6 +2105,21 @@ fn manager_ui_omits_plugin_auto_expand() {
 
     assert!(!source.contains("codexAppPluginAutoExpand"));
     assert!(!source.contains("插件列表全量展示"));
+}
+
+#[test]
+fn project_links_point_to_ad_free_repository() {
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("core crate should live under crates/codex-plus-core");
+    let source = std::fs::read_to_string(repo.join("apps/codex-plus-manager/src/App.tsx")).unwrap();
+    let script = assets::injection_script(57321);
+
+    for content in [&source, &script] {
+        assert!(content.contains("https://github.com/ziiji/CodexPlusPlus-AdFree"));
+        assert!(content.contains("https://github.com/ziiji/CodexPlusPlus-AdFree/issues"));
+    }
 }
 
 #[test]
