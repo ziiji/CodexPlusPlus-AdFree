@@ -14,7 +14,6 @@ struct AppPackageSpec {
 
 const CODEX_PACKAGE_EXECUTABLES: &[&str] = &["ChatGPT.exe", "Codex.exe", "codex.exe"];
 const STANDALONE_CODEX_EXECUTABLES: &[&str] = &["ChatGPT.exe", "Codex.exe", "codex.exe"];
-const CHATGPT_DESKTOP_PACKAGE_IDENTITY: &str = "OpenAI.ChatGPT-Desktop";
 
 #[cfg(windows)]
 const OPENAI_PACKAGE_FAMILY_NAMES: &[&str] = &[
@@ -436,6 +435,20 @@ pub fn build_codex_executable(app_dir: &Path) -> PathBuf {
     app_dir.join("Codex.exe")
 }
 
+pub fn find_bundled_codex_cli(app_dir: &Path) -> Option<PathBuf> {
+    let candidates = if app_dir.extension() == Some(OsStr::new("app")) {
+        vec![app_dir.join("Contents").join("Resources").join("codex")]
+    } else {
+        vec![
+            app_dir.join("resources").join("codex.exe"),
+            app_dir.join("Resources").join("codex.exe"),
+            app_dir.join("resources").join("codex"),
+            app_dir.join("Resources").join("codex"),
+        ]
+    };
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
 pub fn codex_app_version(app_dir: &Path) -> Option<String> {
     if app_dir.extension() == Some(OsStr::new("app")) {
         return macos_app_version(app_dir);
@@ -594,7 +607,6 @@ fn version_tuple(path: &Path) -> Option<Vec<u32>> {
 
 pub(crate) fn is_supported_windows_app_package_name(package_name: &str) -> bool {
     codex_package_parts(package_name).is_some()
-        || package_identity_parts(package_name, CHATGPT_DESKTOP_PACKAGE_IDENTITY).is_some()
 }
 
 pub(crate) fn is_supported_app_executable_name(name: &str) -> bool {
@@ -656,19 +668,21 @@ fn executable_in_dir(dir: &Path) -> Option<PathBuf> {
 
 fn codex_package_parts(package_name: &str) -> Option<(AppPackageSpec, &str, &str)> {
     for spec in APP_PACKAGE_SPECS {
-        if let Some((version, publisher_id)) = package_identity_parts(package_name, spec.identity) {
-            return Some((*spec, version, publisher_id));
-        }
+        let Some(rest) = strip_prefix_ignore_ascii_case(package_name, spec.identity) else {
+            continue;
+        };
+        let Some(rest) = rest.strip_prefix('_') else {
+            continue;
+        };
+        let Some((version, rest)) = rest.split_once('_') else {
+            continue;
+        };
+        let Some((_, publisher_id)) = rest.rsplit_once("__") else {
+            continue;
+        };
+        return Some((*spec, version, publisher_id));
     }
     None
-}
-
-fn package_identity_parts<'a>(package_name: &'a str, identity: &str) -> Option<(&'a str, &'a str)> {
-    let rest = strip_prefix_ignore_ascii_case(package_name, identity)?;
-    let rest = rest.strip_prefix('_')?;
-    let (version, rest) = rest.split_once('_')?;
-    let (_, publisher_id) = rest.rsplit_once("__")?;
-    Some((version, publisher_id))
 }
 
 fn strip_prefix_ignore_ascii_case<'a>(value: &'a str, prefix: &str) -> Option<&'a str> {

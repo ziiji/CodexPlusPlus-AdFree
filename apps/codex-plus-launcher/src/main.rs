@@ -222,16 +222,13 @@ async fn activate_existing_codex_app(options: &LaunchOptions) -> anyhow::Result<
         hooks.start_helper(helper_port).await?;
     }
     let process_ids = codex_plus_core::watcher::find_codex_processes();
-    let mut activated = false;
     #[cfg(windows)]
-    {
-        for process_id in &process_ids {
-            if codex_plus_core::windows_activate_process_window(*process_id) {
-                activated = true;
-                break;
-            }
-        }
-    }
+    let activated = process_ids
+        .iter()
+        .copied()
+        .any(codex_plus_core::windows_activate_process_window);
+    #[cfg(not(windows))]
+    let activated = false;
     let injection_ready = if settings.enhancements_enabled {
         hooks
             .ensure_injection(options.debug_port, helper_port, &app_dir)
@@ -406,6 +403,7 @@ impl LaunchHooks for LauncherHooks {
                             sqlite_user_event_rows_updated: 0,
                             sqlite_cwd_rows_updated: 0,
                             sqlite_catalog_rows_inserted: 0,
+                            sqlite_catalog_rows_removed: 0,
                             updated_workspace_roots: 0,
                             skipped_locked_rollout_files: Vec::new(),
                             encrypted_content_warning: None,
@@ -1111,7 +1109,8 @@ mod tests {
 
         hooks.bridge_context(9229, &test_dir).await.unwrap();
         let ctx = hooks.watchdog_bridge_context().unwrap();
-        let result = codex_plus_core::routes::handle_bridge_request(ctx, "/backend-status", json!({})).await;
+        let result =
+            codex_plus_core::routes::handle_bridge_request(ctx, "/backend/status", json!({})).await;
 
         assert_ne!(result["message"], "Unknown bridge path");
     }

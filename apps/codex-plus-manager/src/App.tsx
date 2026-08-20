@@ -60,6 +60,7 @@ import {
   Settings,
   ShieldCheck,
   ShieldAlert,
+  Star,
   Store,
   Stethoscope,
   Sun,
@@ -94,7 +95,7 @@ import {
   type ImageHandling,
   type ModelWindowRow,
 } from "./model-windows";
-import { relayAuthForLiveDraft } from "./relay-live-files";
+import { relayAuthForLiveDraft, shouldBackfillRelayProfileBeforeSwitch } from "./relay-live-files";
 import { resolveProviderSyncCompletion } from "./provider-sync-flow";
 import { resolveLaunchStatus } from "./launch-status";
 import {
@@ -399,6 +400,10 @@ type WeixinQrResult = CommandResult<{
   hasToken: boolean;
 }>;
 
+type DesktopCodexCliResult = CommandResult<{
+  path: string | null;
+}>;
+
 type RelayResult = CommandResult<{
   authenticated: boolean;
   authSource: string;
@@ -608,6 +613,7 @@ type RemoveEnvConflictsResult = CommandResult<{
 
 type ProviderSyncPayload = {
   syncStatus?: string;
+  syncMessage?: string;
   targetProvider?: string;
   changedSessionFiles?: number;
   skippedLockedRolloutFiles?: string[];
@@ -616,9 +622,11 @@ type ProviderSyncPayload = {
   sqliteUserEventRowsUpdated?: number;
   sqliteCwdRowsUpdated?: number;
   sqliteCatalogRowsInserted?: number;
+  sqliteCatalogRowsRemoved?: number;
   updatedWorkspaceRoots?: number;
   prunedSessionIndexEntries?: number;
   encryptedContentWarning?: string | null;
+  backupDir?: string | null;
 };
 
 type SessionIndexCleanupCandidate = {
@@ -700,6 +708,22 @@ type UpdateResult = CommandResult<{
   progress?: number;
 }>;
 
+type AdItem = {
+  id?: string;
+  type: "sponsor" | "normal" | string;
+  title: string;
+  description: string;
+  url: string;
+  image?: string;
+  highlights?: string[];
+  expires_at?: string;
+};
+
+type AdsResult = CommandResult<{
+  version: number;
+  ads: AdItem[];
+}>;
+
 type ScriptMarketItem = {
   id: string;
   name: string;
@@ -730,17 +754,22 @@ function providerSyncProgressMessage(result: CommandResult<ProviderSyncPayload>)
   const changed = result.changedSessionFiles ?? 0;
   const rows = result.sqliteRowsUpdated ?? 0;
   const insertedCatalogRows = result.sqliteCatalogRowsInserted ?? 0;
+  const removedCatalogRows = result.sqliteCatalogRowsRemoved ?? 0;
   const pruned = result.prunedSessionIndexEntries ?? 0;
   const target = result.targetProvider || t("当前 provider");
   const skipped = result.skippedLockedRolloutFiles?.length ?? 0;
   const prunedText = pruned ? tf("，清理 {0} 条失效任务索引", [pruned]) : "";
   const skippedText = skipped ? tf("，跳过 {0} 个占用文件", [skipped]) : "";
   const catalogText = insertedCatalogRows ? tf("，补齐 {0} 条侧边栏索引", [insertedCatalogRows]) : "";
-  return tf("已同步到 {0}：修复 {1} 个会话文件，更新 {2} 行数据库索引{3}{4}{5}。", [
+  const catalogCleanupText = removedCatalogRows
+    ? tf("，清理 {0} 条误列的子任务侧边栏索引", [removedCatalogRows])
+    : "";
+  return tf("已同步到 {0}：修复 {1} 个会话文件，更新 {2} 行数据库索引{3}{4}{5}{6}。", [
     target,
     changed,
     rows,
     catalogText,
+    catalogCleanupText,
     prunedText,
     skippedText,
   ]);
@@ -788,7 +817,7 @@ type StartupResult = CommandResult<{
   showUpdate: boolean;
 }>;
 
-type Route = "overview" | "relay" | "relayEnvironment" | "sessions" | "context" | "weixin" | "enhance" | "dreamSkin" | "zedRemote" | "userScripts" | "maintenance" | "about" | "settings";
+type Route = "overview" | "relay" | "relayEnvironment" | "sessions" | "context" | "weixin" | "enhance" | "dreamSkin" | "zedRemote" | "userScripts" | "recommendations" | "maintenance" | "about" | "settings";
 type Theme = "dark" | "light";
 
 const routes: Array<{ id: Route; label: string; icon: LucideIcon; badge?: string }> = [
@@ -801,6 +830,7 @@ const routes: Array<{ id: Route; label: string; icon: LucideIcon; badge?: string
   { id: "dreamSkin", label: t("皮肤管理"), icon: Palette },
   { id: "zedRemote", label: t("Zed 远程项目"), icon: ExternalLink },
   { id: "userScripts", label: t("脚本市场"), icon: FileCode2 },
+  { id: "recommendations", label: t("推荐内容"), icon: ExternalLink },
   { id: "maintenance", label: t("安装维护"), icon: Wrench },
   { id: "about", label: t("关于"), icon: Info },
   { id: "settings", label: t("设置"), icon: Settings },
@@ -818,7 +848,7 @@ const navigationSections: Array<{ label: string; routes: Route[]; placement?: "b
   },
   {
     label: t("系统"),
-    routes: ["maintenance", "about", "settings"],
+    routes: ["recommendations", "maintenance", "about", "settings"],
     placement: "bottom",
   },
 ];
@@ -972,6 +1002,7 @@ export function App() {
     percent: 0,
     message: t("尚未运行安装包更新。"),
   });
+  const [ads, setAds] = useState<AdsResult | null>(null);
   const [scriptMarket, setScriptMarket] = useState<ScriptMarketResult | null>(null);
   const [launchForm, setLaunchForm] = useState({
     appPath: "",
@@ -1094,6 +1125,15 @@ export function App() {
     }
   };
 
+  const refreshUserScriptInventory = async () => {
+    const result = await run(() => call<SettingsResult>("refresh_user_script_inventory"));
+    if (result) {
+      setSettings(result);
+      setScriptMarket((current) => syncMarketInstalledState(current, result.user_scripts));
+    }
+    return result;
+  };
+
   const installMarketScript = async (id: string) => {
     const result = await run(() => call<ScriptMarketResult>("install_market_script", { id }));
     if (result) {
@@ -1109,6 +1149,7 @@ export function App() {
       setSettings(result);
       setScriptMarket((current) => syncMarketInstalledState(current, result.user_scripts));
       showResultNotice(t("本地脚本"), result);
+      await refreshUserScriptInventory();
     }
   };
 
@@ -1121,6 +1162,7 @@ export function App() {
       setSettings(result);
       setScriptMarket((current) => syncMarketInstalledState(current, result.user_scripts));
       showResultNotice(t("本地脚本"), result);
+      await refreshUserScriptInventory();
     }
   };
 
@@ -1816,7 +1858,9 @@ export function App() {
     if (next === "userScripts") {
       await refreshSettings(true);
       await refreshScriptMarket(true);
+      await refreshUserScriptInventory();
     }
+    if (next === "recommendations") await refreshAds(true);
     if (next === "about") {
       await refreshOverview(true);
       await refreshLogs(true);
@@ -2183,6 +2227,19 @@ export function App() {
     }
   };
 
+  const useDesktopCodexCli = async () => {
+    const result = await run(() => call<DesktopCodexCliResult>("find_desktop_codex_cli"));
+    if (!result) return;
+    const path = result.path?.trim();
+    if (isSuccessStatus(result.status) && path) {
+      setSettingsForm((current) => ({
+        ...current,
+        weixinConnectCodexPath: path,
+      }));
+    }
+    showResultNotice(t("Codex CLI 路径"), result);
+  };
+
   const resetSettings = async () => {
     const result = await run(() => call<SettingsResult>("reset_settings"));
     if (result) {
@@ -2198,6 +2255,14 @@ export function App() {
       setSettings(result);
       setSettingsForm(normalizeSettings(result.settings));
       showNotice(t("图片覆盖层"), result.message, result.status);
+    }
+  };
+
+  const refreshAds = async (silent = false) => {
+    const result = await run(() => call<AdsResult>("load_ads"));
+    if (result) {
+      setAds(result);
+      if (!silent) showResultNotice(t("推荐内容"), result, { silentSuccess: true });
     }
   };
 
@@ -2242,9 +2307,17 @@ export function App() {
         call<CommandResult<ProviderSyncPayload>>("sync_providers_now", { targetProvider }),
       );
       if (result) {
-        let finalResult = result;
+        const syncSucceeded = isSuccessStatus(result.status) && result.syncStatus === "synced";
+        let finalResult =
+          isSuccessStatus(result.status) && !syncSucceeded
+            ? {
+                ...result,
+                status: "failed",
+                message: result.syncMessage || t("历史会话修复失败，请查看错误提示后重试。"),
+              }
+            : result;
         let cleanupFailure: { status: Status; message: string } | null = null;
-        if (isSuccessStatus(result.status)) {
+        if (syncSucceeded) {
           const preview = await run(() =>
             call<CommandResult<SessionIndexCleanupPreviewPayload>>("preview_session_index_cleanup"),
           );
@@ -2289,7 +2362,7 @@ export function App() {
               : completion.result.message),
           result: completion.result,
         });
-        if (targetProvider) {
+        if (targetProvider && syncSucceeded) {
           const next = {
             ...settingsForm,
             providerSyncLastSelectedProvider: targetProvider,
@@ -2454,7 +2527,7 @@ export function App() {
 
   const testStepwiseSettings = async (settings: BackendSettings) => {
     const result = await run(() => call<StepwiseTestResult>("test_stepwise_settings", { settings }));
-    if (result) showNotice(t("Stepwise 测试"), result.message, result.status);
+    if (result) showNotice("Stepwise 测试", result.message, result.status);
   };
 
   const fetchRelayProfileModels = async (profile: RelayProfile) => {
@@ -2574,8 +2647,8 @@ export function App() {
     next: BackendSettings,
     previousActiveRelayId: string,
   ): Promise<BackendSettings> => {
+    if (!shouldBackfillRelayProfileBeforeSwitch(previousActiveRelayId, next.activeRelayId)) return next;
     const profileId = previousActiveRelayId.trim();
-    if (!profileId) return next;
     const result = await run(() =>
       call<SettingsBackfillResult>("backfill_relay_profile_from_live", {
         request: { settings: next, profileId },
@@ -2933,7 +3006,9 @@ export function App() {
       importCcsProviders,
       refreshLiveContextEntries,
       syncLiveContextEntries,
+      refreshAds,
       refreshScriptMarket,
+      refreshUserScriptInventory,
       installMarketScript,
       setUserScriptEnabled,
       deleteUserScript,
@@ -3122,6 +3197,7 @@ export function App() {
               onStop={() => void stopWeixinConnect()}
               onChooseWorkDir={() => void chooseWeixinPath("workDir")}
               onChooseCodexPath={() => void chooseWeixinPath("codexPath")}
+              onUseDesktopCodexCli={() => void useDesktopCodexCli()}
               onOpenQr={(url) => void openExternalUrl(url)}
               onCopyQr={(url) => void copyText(url, t("微信登录链接已复制。"))}
             />
@@ -3158,6 +3234,7 @@ export function App() {
             <ZedRemoteScreen projects={zedRemoteProjects} form={settingsForm} onFormChange={setSettingsForm} actions={actions} />
           ) : null}
           {route === "userScripts" ? <UserScriptsScreen settings={settings} market={scriptMarket} actions={actions} /> : null}
+          {route === "recommendations" ? <RecommendationsScreen ads={ads} actions={actions} /> : null}
           {route === "maintenance" ? (
             <MaintenanceScreen
               overview={overview}
@@ -3319,7 +3396,9 @@ type Actions = {
   importCcsProviders: () => Promise<void>;
   refreshLiveContextEntries: () => Promise<LiveContextEntriesResult | null>;
   syncLiveContextEntries: (settings: BackendSettings, silent?: boolean) => Promise<LiveContextEntriesResult | null>;
+  refreshAds: () => Promise<void>;
   refreshScriptMarket: () => Promise<void>;
+  refreshUserScriptInventory: () => Promise<SettingsResult | null>;
   installMarketScript: (id: string) => Promise<void>;
   setUserScriptEnabled: (key: string, enabled: boolean) => Promise<void>;
   deleteUserScript: (key: string) => Promise<void>;
@@ -3531,6 +3610,7 @@ function WeixinConnectScreen({
   onStop,
   onChooseWorkDir,
   onChooseCodexPath,
+  onUseDesktopCodexCli,
   onOpenQr,
   onCopyQr,
 }: {
@@ -3545,6 +3625,7 @@ function WeixinConnectScreen({
   onStop: () => void;
   onChooseWorkDir: () => void;
   onChooseCodexPath: () => void;
+  onUseDesktopCodexCli: () => void;
   onOpenQr: (url: string) => void;
   onCopyQr: (url: string) => void;
 }) {
@@ -3783,13 +3864,24 @@ function WeixinConnectScreen({
             <div className="weixin-form-fields">
               <label className="field">
                 <span>{t("Codex CLI 路径")}</span>
-                <div className="weixin-path-row">
+                <div className="weixin-path-row weixin-cli-path-row">
                   <Input
                     className="h-10"
                     onChange={(event) => onFormChange({ ...form, weixinConnectCodexPath: event.target.value })}
                     placeholder={t("留空时从 PATH 查找 codex")}
                     value={form.weixinConnectCodexPath}
                   />
+                  <Button
+                    className="weixin-bundled-cli-button"
+                    onClick={onUseDesktopCodexCli}
+                    size="sm"
+                    title={t("使用桌面版内置 CLI")}
+                    type="button"
+                    variant="secondary"
+                  >
+                    <PackageOpen className="h-4 w-4" />
+                    {t("使用桌面版内置 CLI")}
+                  </Button>
                   <Button onClick={onChooseCodexPath} size="icon" title={t("选择 Codex CLI")} type="button" variant="outline">
                     <ExternalLink className="h-4 w-4" />
                   </Button>
@@ -3815,6 +3907,40 @@ function OverviewScreen({
   const health = healthItems(overview);
   return (
     <>
+      <Panel className="jojocode-overview">
+        <CardContent>
+          <div className="jojocode-overview-layout">
+            <div className="jojocode-overview-main">
+              <div className="jojocode-overview-mark">
+                <Network className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="eyebrow">{t("项目赞助商")}</span>
+                <h2>JOJO Code</h2>
+                <p>
+                  {t("JOJO Code 提供稳定、价格合理的 API 中转服务，支持 GPT-5.6 全系列、Fable 5、Sonnet 5、GPT-5.5、GPT-5.4、Claude Opus 4.8、Claude Opus 4.7、gpt-image-2 等模型与图像能力。")}
+                </p>
+              </div>
+            </div>
+            <div className="jojocode-overview-side">
+              <div className="jojocode-model-tags">
+                <span>GPT-5.6 全系列</span>
+                <span>Fable 5</span>
+                <span>Sonnet 5</span>
+                <span>GPT-5.5</span>
+                <span>GPT-5.4</span>
+                <span>Opus 4.8</span>
+                <span>Opus 4.7</span>
+                <span>gpt-image-2</span>
+              </div>
+              <Button onClick={() => void actions.openExternalUrl("https://jojocode.com/")}>
+                <ExternalLink className="h-4 w-4" />
+                {t("打开 JOJO Code")}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Panel>
       <Panel>
         <CardHead title={t("健康检查")} detail={t("概览只展示关键问题，具体配置在对应页面处理")} />
         <CardContent>
@@ -4270,7 +4396,7 @@ function EnhanceScreen({
               <FeatureToggle title={t("切换对话保留位置")} detail={t("切换 thread 时恢复上一次浏览位置。")} checked={form.codexAppThreadScrollRestore} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppThreadScrollRestore", value)} />
             </FeatureGroup>
             <FeatureGroup title="Stepwise" detail={t("基于当前对话生成下一步建议，使用独立 API 配置。")}>
-              <FeatureToggle title="Stepwise" detail={t("在 Codex 页面显示可拖动的后续建议浮层；建议由单独配置的 Stepwise API 生成。")} checked={form.codexAppStepwiseEnabled} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppStepwiseEnabled", value)} />
+              <FeatureToggle title="Stepwise" detail={t("在 Codex 页面显示可拖动的后续建议浮层；建议由单独配置的 Stepwise API 生成。启停后需重启 Codex++ 生效。")} checked={form.codexAppStepwiseEnabled} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppStepwiseEnabled", value)} />
               <FeatureToggle title={t("Stepwise 直接发送")} detail={t("点击建议后自动发送；关闭时只填入输入框。")} checked={form.codexAppStepwiseDirectSend} disabled={!masterEnabled || !form.codexAppStepwiseEnabled} onChange={(value) => setEnhanceFlag("codexAppStepwiseDirectSend", value)} />
             </FeatureGroup>
             <FeatureGroup title={t("界面与启动")} detail={t("控制语言、启动速度和 Codex 原生界面调整。")}>
@@ -5804,6 +5930,43 @@ function SessionsScreen({
   );
 }
 
+function RecommendationsScreen({ ads, actions }: { ads: AdsResult | null; actions: Actions }) {
+  const items = (ads?.ads ?? []).filter((ad) => !isExpiredAd(ad));
+  const sponsors = items.filter((ad) => ad.type === "sponsor");
+  const normal = items.filter((ad) => ad.type === "normal");
+  return (
+    <>
+      <Panel>
+        <CardHead title={t("推荐内容")} detail={t("与 Codex 内插件菜单使用同一个远端广告源")} />
+        <CardContent>
+          <div className="recommend-hero">
+            <div>
+              <strong>{ads ? tf("已加载 {0} 条推荐", [items.length]) : t("尚未加载推荐内容")}</strong>
+              <span>{t("内容来自 BigPizzaV3/Ad-List，分为赞助商推荐和普通推荐。")}</span>
+            </div>
+            <Button onClick={() => void actions.refreshAds()}>
+              <RefreshCw className="h-4 w-4" />
+              {t("刷新推荐")}
+            </Button>
+          </div>
+        </CardContent>
+      </Panel>
+      <Panel>
+        <CardHead title={t("赞助商推荐")} detail={tf("{0} 条", [sponsors.length])} />
+        <CardContent>
+          <AdGrid actions={actions} ads={sponsors} empty={t("暂无赞助商推荐。")} />
+        </CardContent>
+      </Panel>
+      <Panel>
+        <CardHead title={t("普通推荐")} detail={tf("{0} 条", [normal.length])} />
+        <CardContent>
+          <AdGrid actions={actions} ads={normal} empty={t("暂无普通推荐。")} />
+        </CardContent>
+      </Panel>
+    </>
+  );
+}
+
 function MaintenanceScreen({
   overview,
   watcher,
@@ -5946,16 +6109,24 @@ function AboutScreen({
           <div className="metric-list">
             <Metric label={t("Codex++ 版本")} value={overview?.current_version ?? update?.currentVersion ?? "-"} />
             <Metric label={t("Codex 版本")} value={overview?.codex_version ?? t("未检测到")} />
-            <Metric label={t("项目地址")} value="github.com/ziiji/CodexPlusPlus-AdFree" />
+            <Metric label={t("项目地址")} value="github.com/BigPizzaV3/CodexPlusPlus" />
           </div>
           <Toolbar>
-            <Button onClick={() => void actions.openExternalUrl("https://github.com/ziiji/CodexPlusPlus-AdFree")} variant="secondary">
+            <Button onClick={() => void actions.openExternalUrl("https://github.com/BigPizzaV3/CodexPlusPlus")} variant="secondary">
               <ExternalLink className="h-4 w-4" />
               {t("打开项目主页")}
             </Button>
-            <Button onClick={() => void actions.openExternalUrl("https://github.com/ziiji/CodexPlusPlus-AdFree/issues")} variant="secondary">
+            <Button onClick={() => void actions.openExternalUrl("https://github.com/BigPizzaV3/CodexPlusPlus/issues")} variant="secondary">
               <ExternalLink className="h-4 w-4" />
               {t("反馈问题")}
+            </Button>
+            <Button onClick={() => void actions.openExternalUrl("https://discord.gg/y96kX7A76v")} variant="secondary">
+              <MessageCircle className="h-4 w-4" />
+              Discord
+            </Button>
+            <Button onClick={() => void actions.openExternalUrl("https://t.me/CodexPlusPlus")} variant="secondary">
+              <MessageCircle className="h-4 w-4" />
+              Telegram
             </Button>
           </Toolbar>
         </CardContent>
@@ -6435,6 +6606,8 @@ function SortableRelayProfileCard({
 
 function MarketScriptCard({ script, actions, view = "grid" }: { script: ScriptMarketItem; actions: Actions; view?: "grid" | "list" }) {
   const status = script.updateAvailable ? t("可更新") : script.installed ? tf("已安装 {0}", [script.installedVersion]) : t("未安装");
+  const isGitHubHomepage = script.homepage ? isGitHubRepositoryHomepage(script.homepage) : false;
+  const githubSupportLabel = isGitHubHomepage ? tf("在 GitHub 上支持作者：{0}", [script.name]) : undefined;
   return (
     <div className="script-market-card" data-view={view}>
       <div className="script-market-title">
@@ -6458,13 +6631,24 @@ function MarketScriptCard({ script, actions, view = "grid" }: { script: ScriptMa
         </Button>
         {script.homepage ? (
           <Button
+            aria-label={githubSupportLabel}
             onClick={() => void actions.openExternalUrl(script.homepage)}
             size="sm"
-            title={t("主页")}
+            title={githubSupportLabel}
             variant="secondary"
           >
-            <ExternalLink className="h-4 w-4" />
-            {t("主页")}
+            {isGitHubHomepage ? (
+              <>
+                <Star className="h-4 w-4" />
+                Star
+                <ExternalLink className="h-3 w-3" />
+              </>
+            ) : (
+              <>
+                <ExternalLink className="h-4 w-4" />
+                {t("主页")}
+              </>
+            )}
           </Button>
         ) : null}
       </div>
@@ -6559,12 +6743,7 @@ function RelayProfileDetail({
     const savedProfile = savedSettings.relayProfiles.find((candidate) => candidate.id === normalizedDraft.id)
       ?? normalizedDraft;
     if (isActive && savedSettings.relayProfilesEnabled && relayProfileUsesLiveFiles(savedProfile)) {
-      await actions.saveRelayFile(
-        "config",
-        effectiveRelayConfigPreview(savedProfile, savedSettings, savedProfile),
-        true,
-      );
-      await actions.saveRelayFile("auth", savedProfile.authContents, true);
+      await actions.switchRelayProfile(savedSettings, savedSettings.activeRelayId);
     }
     onSaved?.();
   };
@@ -6714,8 +6893,8 @@ function RelayProfileEditor({
   setModelWindowRows: (value: ModelWindowRow[]) => void;
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  // 纯 Responses 模式（非聚合）下 VLM/Strip 不生效，禁用下拉
-  const vlmUnsupportedProtocol = profile.protocol === "responses" && !isAggregateRelayProfile(profile);
+  // VLM/Strip 对 Chat Completions 与 Responses 协议均可用(注入块类型已按协议适配)。
+  const vlmUnsupportedProtocol = false;
   if (isAggregateRelayProfile(profile)) {
     return (
       <AggregateRelayProfileEditor
@@ -7000,6 +7179,17 @@ function RelayProfileEditor({
                   <Download className="h-4 w-4" />
                   {t("从上游获取")}
                 </Button>
+                <Button
+                  disabled={!modelWindowRows.some((row) => row.model.trim())}
+                  onClick={() => setModelWindowRows([{ model: "", window: "", imageHandling: "send-as-is" }])}
+                  size="sm"
+                  title={t("清空模型")}
+                  type="button"
+                  variant="outline"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {t("清空模型")}
+                </Button>
               </div>
             </div>
             <div className="relay-model-row-editor">
@@ -7027,9 +7217,9 @@ function RelayProfileEditor({
                     onChange={(value) => updateModelWindowRow(index, { imageHandling: value })}
                     options={[
                       { value: "", label: t("纯文本模型请配置此项"), disabled: true },
-                      { value: "send-as-is", label: "send-as-is", title: t("原样发送图片") },
-                      { value: "strip", label: "strip images", title: t("为纯文本模型移除消息中的图片") },
-                      { value: "vlm", label: "VLM analysis", title: t("为纯文本模型配置图片分析路由") },
+                      { value: "send-as-is", label: t("原样发送图片"), title: t("多模态模型直接接收图片,不经过任何处理") },
+                      { value: "strip", label: t("移除图片"), title: t("删掉图片只发文字,避免纯文本模型报错(模型看不到图)") },
+                      { value: "vlm", label: t("视觉辅助分析"), title: t("图片先由视觉辅助模型(Qwen)转成文字描述,纯文本模型也能\"看图\"") },
                     ]}
                     title={vlmUnsupportedProtocol ? t("VLM 仅支持 Chat Completions 协议和聚合模式") : t("多模态模型（支持图片输入的模型）请保持 send-as-is。")}
                   />
@@ -8280,6 +8470,44 @@ function ScriptRow({ script, actions }: { script: NonNullable<UserScriptInventor
   );
 }
 
+function AdGrid({ ads, empty, actions }: { ads: AdItem[]; empty: string; actions: Actions }) {
+  if (!ads.length) return <div className="empty">{empty}</div>;
+  return (
+    <div className="ad-grid">
+      {ads.map((ad) => (
+        <button className="ad-card" key={ad.id || `${ad.type}-${ad.title}`} onClick={() => void actions.openExternalUrl(ad.url)} type="button">
+          {ad.image ? <img alt="" className="ad-image" src={ad.image} /> : null}
+          <div className="ad-content">
+            <strong>{formatAdTitle(ad.title)}</strong>
+            <p>{ad.description}</p>
+          </div>
+          {ad.highlights?.length ? (
+            <div className="ad-tags">
+              {ad.highlights.map((item) => (
+                <span key={item}>{item}</span>
+              ))}
+            </div>
+          ) : null}
+          <span className="ad-link">
+            {t("打开")}
+            <ExternalLink className="h-4 w-4" />
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function formatAdTitle(title: string) {
+  return title.split(/[｜|]/, 1)[0].trim() || title;
+}
+
+function isExpiredAd(ad: AdItem) {
+  if (!ad.expires_at) return false;
+  const expiresAt = Date.parse(ad.expires_at);
+  return Number.isFinite(expiresAt) && expiresAt < Date.now();
+}
+
 function routeTitle(route: Route) {
   return routes.find((item) => item.id === route)?.label ?? t("概览");
 }
@@ -8296,6 +8524,7 @@ function routeSubtitle(route: Route) {
     dreamSkin: t("Codex-Dream-Skin 风格主题和换图"),
     zedRemote: t("管理 Codex SSH 项目并加入 Zed workspace"),
     userScripts: t("内置和用户自定义脚本清单"),
+    recommendations: t("赞助商推荐与普通推荐"),
     maintenance: t("入口安装、修复、Watcher 与手动启动"),
     about: t("版本信息、项目链接、GitHub Release 更新、日志与诊断"),
     settings: t("主题和启动参数"),

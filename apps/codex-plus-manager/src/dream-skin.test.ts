@@ -53,7 +53,7 @@ describe("dream skin theme helpers", () => {
     assert.match(renderer, /__CODEX_PLUS_CLEAR_DREAM_SKIN__/);
   });
 
-  it("preserves target-only theme fields while removing promotions", () => {
+  it("preserves target-only theme fields without rewriting them", () => {
     const theme = normalizeDreamSkinTheme({
       schemaVersion: 1,
       id: "target-theme",
@@ -88,9 +88,6 @@ describe("dream skin theme helpers", () => {
       side: "right",
     });
     assert.deepEqual(theme.customTargetField, { nested: true });
-    assert.equal(theme.promoTitle, undefined);
-    assert.equal(theme.promoSub, undefined);
-    assert.equal(theme.promoUrl, undefined);
   });
 
   it("renders an optional image companion beside the visible composer", async () => {
@@ -133,13 +130,15 @@ describe("dream skin theme helpers", () => {
       "utf8",
     );
 
-    assert.match(renderer, /const shellMain = document\.querySelector\("main\.main-surface"\)/);
+    assert.match(renderer, /const ensureShellMain = \(\) =>/);
+    assert.match(renderer, /main\[class\*="MainContentSurface"\]/);
+    assert.match(renderer, /data-codex-plus-dream-surface/);
     assert.doesNotMatch(renderer, /!shellMain\s*\|\|\s*!shellSidebar/);
     assert.match(compatibility, /main\[class\*="_MainContentSurface_"\]/);
     assert.match(compatibility, /shellMain\.classList\.add\("main-surface"\)/);
     assert.match(compatibility, /data-codex-plus-dream-skin-main-surface/);
     assert.match(compatibility, /clearDreamSkinMainSurfaceCompatibility\(\)/);
-    assert.match(assets, /DREAM_SKIN_RENDERER_REVISION: &str = "19-newchat-fix"/);
+    assert.match(assets, /DREAM_SKIN_RENDERER_REVISION: &str = "20-modern-main-surface"/);
   });
 
   it("extends the Windows wallpaper treatment to right and bottom dock panels", async () => {

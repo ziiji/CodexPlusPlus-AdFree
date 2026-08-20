@@ -57,9 +57,7 @@ pub fn list_dream_skin_themes(
     settings: &BackendSettings,
 ) -> anyhow::Result<DreamSkinThemeLibrary> {
     let default_theme = DreamSkinThemeConfig::default();
-    let active_config = settings
-        .codex_app_dream_skin_theme_config
-        .without_promotional_fields();
+    let active_config = settings.codex_app_dream_skin_theme_config.clone();
     let active_image_path = settings.codex_app_dream_skin_image_path.trim().to_string();
     let mut themes = vec![DreamSkinThemeSummary {
         key: "builtin".to_string(),
@@ -137,9 +135,8 @@ fn read_theme_summary(
     {
         return None;
     }
-    let mut config: DreamSkinThemeConfig =
+    let config: DreamSkinThemeConfig =
         serde_json::from_slice(&std::fs::read(&config_path).ok()?).ok()?;
-    config.remove_promotional_fields();
     if config.id != id || config.name.trim().is_empty() {
         return None;
     }
@@ -281,7 +278,7 @@ pub fn save_dream_skin_theme(
                 "image",
             )?;
         }
-        let config = serde_json::to_vec_pretty(&draft.config.without_promotional_fields())?;
+        let config = serde_json::to_vec_pretty(&draft.config)?;
         if config.len() as u64 > THEME_CONFIG_LIMIT {
             bail!("Dream Skin theme config exceeds 256 KiB");
         }
@@ -388,8 +385,7 @@ pub fn load_stored_dream_skin_theme(
     {
         bail!("invalid Dream Skin theme config");
     }
-    let mut config: DreamSkinThemeConfig = serde_json::from_slice(&std::fs::read(&config_path)?)?;
-    config.remove_promotional_fields();
+    let config: DreamSkinThemeConfig = serde_json::from_slice(&std::fs::read(&config_path)?)?;
     if config.id != id {
         bail!("Dream Skin theme id does not match directory");
     }
@@ -424,7 +420,7 @@ pub fn prepare_dream_skin_activation(
         }
         crate::dream_skin::clear_managed_dream_skin_image(state_dir)?;
         return Ok(DreamSkinActivation {
-            config: draft.config.without_promotional_fields(),
+            config: draft.config.clone(),
             active_image_path: String::new(),
         });
     }
@@ -482,7 +478,7 @@ pub fn prepare_dream_skin_activation(
         }
     }
     Ok(DreamSkinActivation {
-        config: draft.config.without_promotional_fields(),
+        config: draft.config.clone(),
         active_image_path: active_image.to_string_lossy().into_owned(),
     })
 }

@@ -115,6 +115,29 @@ function installRendererStyle(renderer: string) {
 }
 
 describe("renderer injection header compatibility", () => {
+  it("adds the session copy shortcut through the native fork action", async () => {
+    const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
+
+    assert.match(renderer, /原地复制会话 - Codex\+\+/);
+    assert.match(renderer, /createSessionMoreMenuItem\("原地复制会话 - Codex\+\+"/);
+    assert.match(renderer, /getAttribute\("aria-label"\)[\s\S]*聊天操作/);
+    assert.match(renderer, /从这里创建聊天分支/);
+    assert.match(renderer, /data-app-action-sidebar-thread-selected/);
+    assert.match(renderer, /sessionCopyMenuActivationTimeoutMs/);
+    assert.doesNotMatch(renderer, /\n\s*refreshSessionCopyMenuItems\(\);/);
+  });
+
+  it("automatically renames a session through the native title suggestion", async () => {
+    const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
+
+    assert.match(renderer, /自动重命名当前会话/);
+    assert.match(renderer, /activateSessionAutoRenameMenuItem/);
+    assert.match(renderer, /input\[aria-label="聊天标题"\], input\[aria-label="Chat title"\]/);
+    assert.match(renderer, /button\.classList\.contains\("text-info"\)/);
+    assert.match(renderer, /\^\(保存\|Save\)\$/);
+    assert.match(renderer, /Codex 未能生成新名称/);
+  });
+
   it("anchors the Codex++ menu to current and legacy application top bars only", async () => {
     const renderer = await readFile(new URL("../../../assets/inject/renderer-inject.js", import.meta.url), "utf8");
 
@@ -177,5 +200,18 @@ describe("renderer injection header compatibility", () => {
     assert.match(renderer, /window\.__CODEX_PLUS_HIDE_OFFICIAL_USAGE_ALERT__ = nextStatus\.hideOfficialUsageAlert/);
     assert.match(renderer, /\[data-codex-plus-usage-alert-hidden="true"\] \{ display: none !important; \}/);
     assert.doesNotMatch(renderer, /container\.style\.(?:setProperty|removeProperty)\("display"/);
+  });
+
+  it("keeps Windows Dream Skin compatible with the modern Codex main surface", async () => {
+    const windowsRenderers = await Promise.all([
+      readFile(new URL("../../../assets/inject/upstream/dream-skin/windows/renderer-inject.js", import.meta.url), "utf8"),
+      readFile(new URL("../../../assets/inject/upstream/cidala-tiger/windows/renderer-inject.js", import.meta.url), "utf8"),
+    ]);
+
+    for (const renderer of windowsRenderers) {
+      assert.match(renderer, /MainContentSurface/);
+      assert.match(renderer, /data-codex-plus-dream-surface/);
+      assert.match(renderer, /ensureShellMain/);
+    }
   });
 });

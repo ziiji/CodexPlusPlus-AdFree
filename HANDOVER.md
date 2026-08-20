@@ -1,59 +1,54 @@
-# HANDOVER - CodexPlusPlus Ad-Free
+# HANDOVER — CodexPlusPlus
 
 ## Active Work
 
-Sync the ad-free fork from upstream `v1.2.46` to `v1.2.47`.
+### PR #1247: guard port auto-offset for multi-user RDP
 
-- Upstream: `BigPizzaV3/CodexPlusPlus`
-- Fork: `ziiji/CodexPlusPlus-AdFree`
-- Upstream tag: `v1.2.47` (`900d127`)
-- Release commit subject: `Publish v1.2.47 ad-free fork`
+**PR:** https://github.com/BigPizzaV3/CodexPlusPlus/pull/1247
+**Branch:** `fix/guard-port-offset` (on lennney fork)
 
-## Completed
+### What was done
 
-- Merged the official `v1.2.47` source tree, preserving per-model relay routing, native certificate handling, current Codex top-bar compatibility, and the DreamSkin runtime updates.
-- Reapplied the existing ad-free patch after the merge; remote ad loading, bundled sponsors, recommendation pages, injected promotion entries, and promotional theme fields remain removed.
-- Updated release-facing documentation to `1.2.47`.
-- Preserved the fork update channel at `ziiji/CodexPlusPlus-AdFree`.
-- Kept the default ad source list empty and removed the new bundled upstream sponsors.
-- Preserved the upstream `v1.2.45` feature changes, including the native new-thread flow, VLM bridge fixes, installer progress handling, and renderer updates.
-- Preserved the upstream `v1.2.46` DreamSkin community gallery, one-click installation flow, and local package safety verification.
-- Preserved the upstream `v1.2.47` provider-scoped model routing and protocol proxy changes.
-- Kept provider presets that users explicitly select; they are not rendered automatically as ads.
+Replaced hardcoded guard port constants with dynamic resolution:
 
-## Verification
+| Before | After |
+|--------|-------|
+| `LAUNCHER_GUARD_PORT = 57320` | `launcher_guard_port()` — function with offset |
+| `MANAGER_GUARD_PORT = 57319` | `manager_guard_port()` — function with offset |
 
-Passed locally:
+Resolution order:
+1. `CODEX_PLUS_GUARD_PORT` — exact port override
+2. `CODEX_PLUS_{LAUNCHER,MANAGER}_GUARD_PORT` — per-role override
+3. `CODEX_PLUS_GUARD_PORT_OFFSET` — explicit offset (e.g. +50)
+4. Windows: `USERNAME` hash mod 1000 (auto per-user isolation)
+5. Other platforms: 0 (backward compatible)
 
-```text
-npm test: 36 passed, 0 failed
-npm run check: passed
-npm run vite:build: passed
-node --check assets/inject/renderer-inject.js
-JSON parse check: 22 files valid
-runtime ad-marker scan: clean
-release binary ad-marker scan: clean
-git diff --check: clean
-theme JSON SHA-256 checks: all expected values matched
-cargo test -p codex-plus-core: passed with one Windows privilege-only test skipped
-cargo build --release: passed
+### CI Fix (2026-06-28 23:19)
+
+**Problem:** All 3 platform builds failed with Rust E0308 type mismatch.
+**Root cause:** `.and_then(|v| v.parse::<u16>().map_err(|_| ()))` — the `.or_else()` chain maintained `Result<_, VarError>` type but `.map_err(|_| ())` produced `Result<_, ()>`.
+**Fix (5f9305f):** Switched to Option chain: `.ok().and_then(|v| v.parse().ok())`
+**Code review:** APPROVED ✅
+**CI:** Run 28326773669 in progress
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `crates/codex-plus-core/src/ports.rs` | +2 functions, +6 tests, base constants, Option chain fix |
+| `apps/codex-plus-launcher/src/main.rs` | 4 references updated + test assertion |
+| `apps/codex-plus-manager/src-tauri/src/lib.rs` | 5 references updated |
+| `apps/codex-plus-manager/src-tauri/tests/windows_subsystem.rs` | 1 assertion updated |
+
+### Commits
+
+```
+5f9305f fix(ports): use Option chain for env var parsing to resolve type mismatch
+3a4f0aa fix(guard): auto-offset guard port by USERNAME for multi-user RDP
 ```
 
-Installed development dependencies:
+### Next steps
 
-```text
-Node.js 24.18.1 / npm 11.16.0
-frontend dependencies from npm ci
-rustc/cargo 1.97.1 (stable-x86_64-pc-windows-msvc)
-NSIS 3.12
-```
-
-`app_paths_resolves_portable_current_link_to_directory_version` requires Windows symbolic-link privileges and was skipped because this session was not elevated. All other Rust tests passed in a single-threaded run. A parallel run also exposed one transient mock HTTP 502; the affected test passed alone and in the final single-threaded suite.
-
-## Next Steps
-
-1. Build the NSIS installer and release metadata.
-2. Publish the `v1.2.47` installers and `latest.json`.
-3. Tag the final release commit as `v1.2.47` and push `main` plus the tag to the fork.
-
-Unused sponsor images remain in the source history but have no code or documentation references and are not embedded in the executable. Do not bulk-delete them unless repository-level asset removal is explicitly desired.
+1. Wait for CI (run 28326773669) to complete — verify all 3 platforms green
+2. Wait for upstream maintainer review
+3. If maintainer requests changes, address them
