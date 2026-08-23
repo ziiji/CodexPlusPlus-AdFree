@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="Release" src="https://img.shields.io/github/v/release/BigPizzaV3/CodexPlusPlus">
-  <img alt="Stars" src="https://img.shields.io/github/stars/BigPizzaV3/CodexPlusPlus">
-  <img alt="License" src="https://img.shields.io/github/license/BigPizzaV3/CodexPlusPlus">
+  <img alt="Release" src="https://img.shields.io/github/v/release/ziiji/CodexPlusPlus-AdFree">
+  <img alt="Stars" src="https://img.shields.io/github/stars/ziiji/CodexPlusPlus-AdFree">
+  <img alt="License" src="https://img.shields.io/github/license/ziiji/CodexPlusPlus-AdFree">
   <img alt="Rust" src="https://img.shields.io/badge/rust-1.85%2B-orange">
   <img alt="Tauri" src="https://img.shields.io/badge/tauri-2.x-24C8DB">
 </p>
@@ -20,7 +20,7 @@ Codex++ 是面向 OpenAI Codex / ChatGPT 桌面应用的外部启动器与管理
 
 ## 快速使用
 
-从 [GitHub Releases](https://github.com/BigPizzaV3/CodexPlusPlus/releases) 下载最新版安装包：
+从 [GitHub Releases](https://github.com/ziiji/CodexPlusPlus-AdFree/releases) 下载最新版安装包：
 
 - Windows：`CodexPlusPlus-*-windows-x64-setup.exe`
 - macOS Intel：`CodexPlusPlus-*-macos-x64.dmg`
