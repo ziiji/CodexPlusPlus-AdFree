@@ -60,6 +60,7 @@ import {
   Settings,
   ShieldCheck,
   ShieldAlert,
+  Star,
   Store,
   Stethoscope,
   Sun,
@@ -280,6 +281,7 @@ export type RelayProfile = {
   apiKey: string;
   protocol: RelayProtocol;
   relayMode: RelayMode;
+  sessionProvider?: RelaySessionProvider;
   officialMixApiKey: boolean;
   hideOfficialUsageAlert: boolean;
   testModel: string;
@@ -319,6 +321,7 @@ type AggregateRelayMember = {
 type AggregateRelayProfile = {
   id: string;
   name: string;
+  sessionProvider?: RelaySessionProvider;
   strategy: RelayAggregateStrategy;
   members: AggregateRelayMember[];
 };
@@ -348,6 +351,7 @@ type CodexContextEntries = {
 
 type RelayProtocol = "responses" | "chatCompletions";
 type RelayMode = "official" | "mixedApi" | "pureApi" | "aggregate";
+type RelaySessionProvider = "custom" | "openai";
 const CHAT_UPSTREAM_BASE_URL_KEY = "codex_plus_chat_base_url";
 const SCRIPT_MARKET_REPOSITORY_URL = "https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket";
 
@@ -441,6 +445,16 @@ type LocalSessionsResult = CommandResult<{
   offset: number;
   limit: number;
   hasMore: boolean;
+  totalCount: number;
+}>;
+
+type SessionImportResult = CommandResult<{
+  sessionId: string;
+  title: string;
+}>;
+
+type PendingSessionShareResult = CommandResult<{
+  url: string | null;
 }>;
 
 type ZedRemoteProject = {
@@ -625,6 +639,12 @@ type ProviderSyncPayload = {
   updatedWorkspaceRoots?: number;
   prunedSessionIndexEntries?: number;
   encryptedContentWarning?: string | null;
+  repairAudit?: {
+    catalogOnlySessions: number;
+    catalogOnlyWithCurrentRollout: number;
+    catalogOnlyWithBackupDatabase: number;
+    catalogOnlyWithoutRecoverySource: number;
+  };
   backupDir?: string | null;
 };
 
@@ -705,6 +725,22 @@ type UpdateResult = CommandResult<{
   updateAvailable?: boolean;
   installedPath?: string;
   progress?: number;
+}>;
+
+type AdItem = {
+  id?: string;
+  type: "sponsor" | "normal" | string;
+  title: string;
+  description: string;
+  url: string;
+  image?: string;
+  highlights?: string[];
+  expires_at?: string;
+};
+
+type AdsResult = CommandResult<{
+  version: number;
+  ads: AdItem[];
 }>;
 
 type ScriptMarketItem = {
@@ -800,7 +836,7 @@ type StartupResult = CommandResult<{
   showUpdate: boolean;
 }>;
 
-type Route = "overview" | "relay" | "relayEnvironment" | "sessions" | "context" | "weixin" | "enhance" | "dreamSkin" | "zedRemote" | "userScripts" | "maintenance" | "about" | "settings";
+type Route = "overview" | "relay" | "relayEnvironment" | "sessions" | "context" | "weixin" | "enhance" | "dreamSkin" | "zedRemote" | "userScripts" | "recommendations" | "maintenance" | "about" | "settings";
 type Theme = "dark" | "light";
 
 const routes: Array<{ id: Route; label: string; icon: LucideIcon; badge?: string }> = [
@@ -813,6 +849,7 @@ const routes: Array<{ id: Route; label: string; icon: LucideIcon; badge?: string
   { id: "dreamSkin", label: t("皮肤管理"), icon: Palette },
   { id: "zedRemote", label: t("Zed 远程项目"), icon: ExternalLink },
   { id: "userScripts", label: t("脚本市场"), icon: FileCode2 },
+  { id: "recommendations", label: t("推荐内容"), icon: ExternalLink },
   { id: "maintenance", label: t("安装维护"), icon: Wrench },
   { id: "about", label: t("关于"), icon: Info },
   { id: "settings", label: t("设置"), icon: Settings },
@@ -830,7 +867,7 @@ const navigationSections: Array<{ label: string; routes: Route[]; placement?: "b
   },
   {
     label: t("系统"),
-    routes: ["maintenance", "about", "settings"],
+    routes: ["recommendations", "maintenance", "about", "settings"],
     placement: "bottom",
   },
 ];
@@ -961,6 +998,7 @@ export function App() {
   const [ccsProviders, setCcsProviders] = useState<CcsProvidersResult | null>(null);
   const [pendingProviderImport, setPendingProviderImport] = useState<ProviderImportRequest | null>(null);
   const [localSessions, setLocalSessions] = useState<LocalSessionsResult | null>(null);
+  const [sessionShareUrl, setSessionShareUrl] = useState("");
   const [zedRemoteProjects, setZedRemoteProjects] = useState<ZedRemoteProjectsResult | null>(null);
   const [liveContextEntries, setLiveContextEntries] = useState<CodexContextEntries | null>(null);
   const [logs, setLogs] = useState<LogsResult | null>(null);
@@ -984,6 +1022,7 @@ export function App() {
     percent: 0,
     message: t("尚未运行安装包更新。"),
   });
+  const [ads, setAds] = useState<AdsResult | null>(null);
   const [scriptMarket, setScriptMarket] = useState<ScriptMarketResult | null>(null);
   const [launchForm, setLaunchForm] = useState({
     appPath: "",
@@ -1258,6 +1297,51 @@ export function App() {
       if (!silent || !isSuccessStatus(result.status)) showResultNotice(t("会话管理"), result, { silentSuccess: true });
     }
     return result;
+  };
+
+  const importLocalSession = async () => {
+    let selected: string | string[] | null;
+    try {
+      selected = await open({
+        title: t("导入 Codex 会话"),
+        multiple: false,
+        directory: false,
+        filters: [{ name: t("会话文件"), extensions: ["jsonl", "json", "txt"] }],
+      });
+    } catch (error) {
+      showNotice(t("会话导入"), tf("打开选择器失败：{0}", [stringifyError(error)]), "failed");
+      return;
+    }
+    const path = Array.isArray(selected) ? selected[0] : selected;
+    if (!path) return;
+    const result = await run(() => call<SessionImportResult>("import_local_session", { path }));
+    if (!result) return;
+    showResultNotice(t("会话导入"), result);
+    if (isSuccessStatus(result.status)) await refreshLocalSessions(true, 0);
+  };
+
+  const refreshPendingSessionShare = async (silent = true) => {
+    const result = await run(() => call<PendingSessionShareResult>("load_pending_session_share"));
+    if (result?.url) setSessionShareUrl(result.url);
+    if (result && (!silent || !isSuccessStatus(result.status))) {
+      showResultNotice(t("会话导入"), result, { silentSuccess: true });
+    }
+    return result;
+  };
+
+  const importSessionUrl = async (value = sessionShareUrl) => {
+    const url = value.trim();
+    if (!url) {
+      showNotice(t("会话导入"), t("请粘贴 Codex++ 分享链接。"), "failed");
+      return;
+    }
+    const result = await run(() => call<SessionImportResult>("import_session_url", { url }));
+    if (!result) return;
+    showResultNotice(t("会话导入"), result);
+    if (isSuccessStatus(result.status)) {
+      setSessionShareUrl("");
+      await refreshLocalSessions(true, 0);
+    }
   };
 
   const refreshZedRemoteProjects = async (silent = false) => {
@@ -1841,6 +1925,7 @@ export function App() {
       await refreshScriptMarket(true);
       await refreshUserScriptInventory();
     }
+    if (next === "recommendations") await refreshAds(true);
     if (next === "about") {
       await refreshOverview(true);
       await refreshLogs(true);
@@ -2238,6 +2323,14 @@ export function App() {
     }
   };
 
+  const refreshAds = async (silent = false) => {
+    const result = await run(() => call<AdsResult>("load_ads"));
+    if (result) {
+      setAds(result);
+      if (!silent) showResultNotice(t("推荐内容"), result, { silentSuccess: true });
+    }
+  };
+
   const refreshProviderSyncTargets = async (silent = false) => {
     const result = await run(() => call<ProviderSyncTargetsResult>("load_provider_sync_targets"));
     if (result) {
@@ -2499,7 +2592,7 @@ export function App() {
 
   const testStepwiseSettings = async (settings: BackendSettings) => {
     const result = await run(() => call<StepwiseTestResult>("test_stepwise_settings", { settings }));
-    if (result) showNotice(t("Stepwise 测试"), result.message, result.status);
+    if (result) showNotice("Stepwise 测试", result.message, result.status);
   };
 
   const fetchRelayProfileModels = async (profile: RelayProfile) => {
@@ -2686,6 +2779,7 @@ export function App() {
       await refreshEnvConflicts(true);
       await refreshProviderSyncTargets(true);
       await refreshPendingProviderImport(true);
+      await refreshPendingSessionShare(true);
       await refreshPendingDreamSkinCommunity();
       await refreshRemotePluginMarketplace(true);
     })();
@@ -2705,6 +2799,7 @@ export function App() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       void refreshPendingProviderImport(true);
+      void refreshPendingSessionShare(true);
       void refreshPendingDreamSkinCommunity();
     }, 1200);
     return () => window.clearInterval(timer);
@@ -2978,12 +3073,17 @@ export function App() {
       importCcsProviders,
       refreshLiveContextEntries,
       syncLiveContextEntries,
+      refreshAds,
       refreshScriptMarket,
       refreshUserScriptInventory,
       installMarketScript,
       setUserScriptEnabled,
       deleteUserScript,
       refreshLocalSessions,
+      importLocalSession,
+      importSessionUrl,
+      sessionShareUrl,
+      setSessionShareUrl,
       deleteLocalSession,
       deleteLocalSessions,
       refreshZedRemoteProjects,
@@ -3025,7 +3125,7 @@ export function App() {
       disableWatcher: () => watcherAction("disable_watcher"),
       toggleTheme: () => setTheme((current) => (current === "dark" ? "light" : "dark")),
     }),
-    [route, launchForm, settingsForm, settings, overview, removeOwnedData, update, updateInstallProgress.active, logs, diagnostics, theme, relayFiles, localSessions, zedRemoteProjects, selectedProviderSyncTarget, envConflicts, relayEnvironment, ccsProviders, dreamSkinLibrary, dreamSkinMarket, dreamSkinCommunity, selectedDreamSkinTheme, savedDreamSkinThemeDraft, dreamSkinThemeDraft, dreamSkinDraftDirty, pendingDreamSkinRestart],
+    [route, launchForm, settingsForm, settings, overview, removeOwnedData, update, updateInstallProgress.active, logs, diagnostics, theme, relayFiles, localSessions, sessionShareUrl, importSessionUrl, zedRemoteProjects, selectedProviderSyncTarget, envConflicts, relayEnvironment, ccsProviders, dreamSkinLibrary, dreamSkinMarket, dreamSkinCommunity, selectedDreamSkinTheme, savedDreamSkinThemeDraft, dreamSkinThemeDraft, dreamSkinDraftDirty, pendingDreamSkinRestart],
   );
   const hasUpdate = update?.updateAvailable === true;
 
@@ -3205,6 +3305,7 @@ export function App() {
             <ZedRemoteScreen projects={zedRemoteProjects} form={settingsForm} onFormChange={setSettingsForm} actions={actions} />
           ) : null}
           {route === "userScripts" ? <UserScriptsScreen settings={settings} market={scriptMarket} actions={actions} /> : null}
+          {route === "recommendations" ? <RecommendationsScreen ads={ads} actions={actions} /> : null}
           {route === "maintenance" ? (
             <MaintenanceScreen
               overview={overview}
@@ -3366,12 +3467,17 @@ type Actions = {
   importCcsProviders: () => Promise<void>;
   refreshLiveContextEntries: () => Promise<LiveContextEntriesResult | null>;
   syncLiveContextEntries: (settings: BackendSettings, silent?: boolean) => Promise<LiveContextEntriesResult | null>;
+  refreshAds: () => Promise<void>;
   refreshScriptMarket: () => Promise<void>;
   refreshUserScriptInventory: () => Promise<SettingsResult | null>;
   installMarketScript: (id: string) => Promise<void>;
   setUserScriptEnabled: (key: string, enabled: boolean) => Promise<void>;
   deleteUserScript: (key: string) => Promise<void>;
   refreshLocalSessions: (silent?: boolean, offset?: number) => Promise<LocalSessionsResult | null>;
+  importLocalSession: () => Promise<void>;
+  importSessionUrl: (url?: string) => Promise<void>;
+  sessionShareUrl: string;
+  setSessionShareUrl: (url: string) => void;
   deleteLocalSession: (session: LocalSession) => Promise<void>;
   deleteLocalSessions: (sessions: LocalSession[]) => Promise<void>;
   refreshZedRemoteProjects: () => Promise<ZedRemoteProjectsResult | null>;
@@ -3876,6 +3982,40 @@ function OverviewScreen({
   const health = healthItems(overview);
   return (
     <>
+      <Panel className="jojocode-overview">
+        <CardContent>
+          <div className="jojocode-overview-layout">
+            <div className="jojocode-overview-main">
+              <div className="jojocode-overview-mark">
+                <Network className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="eyebrow">{t("项目赞助商")}</span>
+                <h2>JOJO Code</h2>
+                <p>
+                  {t("JOJO Code 提供稳定、价格合理的 API 中转服务，支持 GPT-5.6 全系列、Fable 5、Sonnet 5、GPT-5.5、GPT-5.4、Claude Opus 4.8、Claude Opus 4.7、gpt-image-2 等模型与图像能力。")}
+                </p>
+              </div>
+            </div>
+            <div className="jojocode-overview-side">
+              <div className="jojocode-model-tags">
+                <span>GPT-5.6 全系列</span>
+                <span>Fable 5</span>
+                <span>Sonnet 5</span>
+                <span>GPT-5.5</span>
+                <span>GPT-5.4</span>
+                <span>Opus 4.8</span>
+                <span>Opus 4.7</span>
+                <span>gpt-image-2</span>
+              </div>
+              <Button onClick={() => void actions.openExternalUrl("https://jojocode.com/")}>
+                <ExternalLink className="h-4 w-4" />
+                {t("打开 JOJO Code")}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Panel>
       <Panel>
         <CardHead title={t("健康检查")} detail={t("概览只展示关键问题，具体配置在对应页面处理")} />
         <CardContent>
@@ -4338,7 +4478,6 @@ function EnhanceScreen({
               {isWindowsPlatform ? <FeatureToggle title={t("桌宠跟随真实鼠标")} detail={t("仅支持 V2 桌宠；不会修改宠物文件。将 V2 的 Computer Use 光标朝向动作映射到真实鼠标，V1 开启后安全不生效；拖拽、原生悬停或 Computer Use 活跃时自动让步。")} checked={form.codexAppPetRealMouseLook} disabled={!masterEnabled} onChange={(value) => setPersistedEnhanceFlag("codexAppPetRealMouseLook", value)} /> : null}
               <FeatureToggle title={t("强制中文界面")} detail={t("强制启用 Codex App 内置 zh-CN 语言包，避免 Statsig/VPN 不通时回退英文。需重启 Codex 才能完整生效。")} checked={form.codexAppForceChineseLocale} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppForceChineseLocale", value)} />
               <FeatureToggle title={t("快速启动")} detail={t("默认关闭；无 VPN 时可开启，让 Statsig 初始化快速失败，减少启动时长。需重启 Codex 才生效。")} checked={form.codexAppFastStartup} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppFastStartup", value)} />
-              <FeatureToggle title={t("原生菜单栏位置")} detail={t("把 Codex++ 菜单插入 Codex 顶部原生菜单栏。")} checked={form.codexAppNativeMenuPlacement} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppNativeMenuPlacement", value)} />
               <FeatureToggle title={t("原生菜单汉化")} detail={t("启动时通过本地主进程调试端口汉化 Codex 原生菜单；不修改安装包。需重启 Codex 才生效。")} checked={form.codexAppNativeMenuLocalization} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppNativeMenuLocalization", value)} />
             </FeatureGroup>
             <FeatureGroup title={t("远程项目")} detail={t("连接 Zed Remote 和 upstream worktree 辅助能力。")}>
@@ -5634,6 +5773,7 @@ function SessionsScreen({
   const hasNextPage = sessions?.hasMore === true;
   const activeCount = items.filter((item) => !item.archived).length;
   const archivedCount = items.length - activeCount;
+  const totalCount = sessions?.totalCount ?? items.length;
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(() => new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -5688,6 +5828,10 @@ function SessionsScreen({
         <CardContent className="sessions-overview-content">
           <div className="session-summary-bar">
             <div>
+              <span>{t("会话总数")}</span>
+              <strong>{tf("{0} 个", [totalCount])}</strong>
+            </div>
+            <div>
               <span>{t("当前页会话")}</span>
               <strong>{tf("{0} 个", [items.length])}</strong>
             </div>
@@ -5740,6 +5884,10 @@ function SessionsScreen({
                 <RefreshCw className="h-4 w-4" />
                 {t("刷新会话")}
               </Button>
+              <Button onClick={() => void actions.importLocalSession()} variant="outline">
+                <PackageOpen className="h-4 w-4" />
+                {t("导入文件")}
+              </Button>
               <Button disabled={providerSyncProgress.active} onClick={() => void actions.syncProvidersNow()} variant="outline">
                 <Wrench className="h-4 w-4" />
                 {providerSyncProgress.active ? t("正在修复…") : t("修复历史会话")}
@@ -5749,13 +5897,25 @@ function SessionsScreen({
                 {t("保存设置")}
               </Button>
             </div>
+            <div className="session-share-import">
+              <Input
+                aria-label={t("会话分享链接")}
+                onChange={(event) => actions.setSessionShareUrl(event.currentTarget.value)}
+                placeholder={t("粘贴 Codex++ 会话分享链接")}
+                value={actions.sessionShareUrl}
+              />
+              <Button disabled={!actions.sessionShareUrl.trim()} onClick={() => void actions.importSessionUrl()} variant="outline">
+                <Download className="h-4 w-4" />
+                {t("导入链接")}
+              </Button>
+            </div>
           </div>
 
           {providerSyncProgress.active || providerSyncProgress.percent > 0 ? (
             <div className="provider-sync-progress session-repair-progress" data-active={providerSyncProgress.active}>
               <div className="provider-sync-progress-head">
                 <strong>{providerSyncProgress.active ? t("正在修复历史会话") : t("历史会话修复进度")}</strong>
-                <span>{providerSyncProgress.percent}%</span>
+                <span>{formatProgressPercent(providerSyncProgress.percent)}%</span>
               </div>
               <div
                 aria-valuemax={100}
@@ -5859,6 +6019,43 @@ function SessionsScreen({
           ) : (
             <div className="empty">{t("未读取到本地会话，或当前 SQLite 会话库不存在。")}</div>
           )}
+        </CardContent>
+      </Panel>
+    </>
+  );
+}
+
+function RecommendationsScreen({ ads, actions }: { ads: AdsResult | null; actions: Actions }) {
+  const items = (ads?.ads ?? []).filter((ad) => !isExpiredAd(ad));
+  const sponsors = items.filter((ad) => ad.type === "sponsor");
+  const normal = items.filter((ad) => ad.type === "normal");
+  return (
+    <>
+      <Panel>
+        <CardHead title={t("推荐内容")} detail={t("与 Codex 内插件菜单使用同一个远端广告源")} />
+        <CardContent>
+          <div className="recommend-hero">
+            <div>
+              <strong>{ads ? tf("已加载 {0} 条推荐", [items.length]) : t("尚未加载推荐内容")}</strong>
+              <span>{t("内容来自 BigPizzaV3/Ad-List，分为赞助商推荐和普通推荐。")}</span>
+            </div>
+            <Button onClick={() => void actions.refreshAds()}>
+              <RefreshCw className="h-4 w-4" />
+              {t("刷新推荐")}
+            </Button>
+          </div>
+        </CardContent>
+      </Panel>
+      <Panel>
+        <CardHead title={t("赞助商推荐")} detail={tf("{0} 条", [sponsors.length])} />
+        <CardContent>
+          <AdGrid actions={actions} ads={sponsors} empty={t("暂无赞助商推荐。")} />
+        </CardContent>
+      </Panel>
+      <Panel>
+        <CardHead title={t("普通推荐")} detail={tf("{0} 条", [normal.length])} />
+        <CardContent>
+          <AdGrid actions={actions} ads={normal} empty={t("暂无普通推荐。")} />
         </CardContent>
       </Panel>
     </>
@@ -6007,16 +6204,24 @@ function AboutScreen({
           <div className="metric-list">
             <Metric label={t("Codex++ 版本")} value={overview?.current_version ?? update?.currentVersion ?? "-"} />
             <Metric label={t("Codex 版本")} value={overview?.codex_version ?? t("未检测到")} />
-            <Metric label={t("项目地址")} value="github.com/ziiji/CodexPlusPlus-AdFree" />
+            <Metric label={t("项目地址")} value="github.com/BigPizzaV3/CodexPlusPlus" />
           </div>
           <Toolbar>
-            <Button onClick={() => void actions.openExternalUrl("https://github.com/ziiji/CodexPlusPlus-AdFree")} variant="secondary">
+            <Button onClick={() => void actions.openExternalUrl("https://github.com/BigPizzaV3/CodexPlusPlus")} variant="secondary">
               <ExternalLink className="h-4 w-4" />
               {t("打开项目主页")}
             </Button>
-            <Button onClick={() => void actions.openExternalUrl("https://github.com/ziiji/CodexPlusPlus-AdFree/issues")} variant="secondary">
+            <Button onClick={() => void actions.openExternalUrl("https://github.com/BigPizzaV3/CodexPlusPlus/issues")} variant="secondary">
               <ExternalLink className="h-4 w-4" />
               {t("反馈问题")}
+            </Button>
+            <Button onClick={() => void actions.openExternalUrl("https://discord.gg/y96kX7A76v")} variant="secondary">
+              <MessageCircle className="h-4 w-4" />
+              Discord
+            </Button>
+            <Button onClick={() => void actions.openExternalUrl("https://t.me/CodexPlusPlus")} variant="secondary">
+              <MessageCircle className="h-4 w-4" />
+              Telegram
             </Button>
           </Toolbar>
         </CardContent>
@@ -6028,7 +6233,7 @@ function AboutScreen({
             <Metric label={t("状态")} value={update?.status ?? "not_checked"} />
             <Metric label={t("最新版本")} value={update?.latestVersion ?? t("未检查")} />
             <Metric label={t("资源")} value={update?.assetName ?? "-"} />
-            <Metric label={t("进度")} value={`${update?.progress ?? 0}%`} />
+            <Metric label={t("进度")} value={`${formatProgressPercent(update?.progress ?? 0)}%`} />
           </div>
           <Textarea className="log-view" readOnly value={update?.releaseSummary || update?.message || t("尚未检查 GitHub Release；更新会下载并启动安装包。")} />
           <TaskProgressBox completedTitle={t("上次更新结果")} progress={updateInstallProgress} title={t("安装包更新进度")} />
@@ -6496,6 +6701,8 @@ function SortableRelayProfileCard({
 
 function MarketScriptCard({ script, actions, view = "grid" }: { script: ScriptMarketItem; actions: Actions; view?: "grid" | "list" }) {
   const status = script.updateAvailable ? t("可更新") : script.installed ? tf("已安装 {0}", [script.installedVersion]) : t("未安装");
+  const isGitHubHomepage = script.homepage ? isGitHubRepositoryHomepage(script.homepage) : false;
+  const githubSupportLabel = isGitHubHomepage ? tf("在 GitHub 上支持作者：{0}", [script.name]) : undefined;
   return (
     <div className="script-market-card" data-view={view}>
       <div className="script-market-title">
@@ -6519,13 +6726,24 @@ function MarketScriptCard({ script, actions, view = "grid" }: { script: ScriptMa
         </Button>
         {script.homepage ? (
           <Button
+            aria-label={githubSupportLabel}
             onClick={() => void actions.openExternalUrl(script.homepage)}
             size="sm"
-            title={t("主页")}
+            title={githubSupportLabel}
             variant="secondary"
           >
-            <ExternalLink className="h-4 w-4" />
-            {t("主页")}
+            {isGitHubHomepage ? (
+              <>
+                <Star className="h-4 w-4" />
+                Star
+                <ExternalLink className="h-3 w-3" />
+              </>
+            ) : (
+              <>
+                <ExternalLink className="h-4 w-4" />
+                {t("主页")}
+              </>
+            )}
           </Button>
         ) : null}
       </div>
@@ -6582,9 +6800,10 @@ function RelayProfileDetail({
     setModelWindowRows(modelWindowRowsFromProfile(nextDraft.modelList, nextDraft.modelWindows || "", nextDraft.modelVlm));
   }, [profile.id, profile.modelList, profile.modelWindows, profileUsesLiveFiles, isActive, isNew, relayFiles?.configContents, relayFiles?.authContents]);
   const validationSettings = relaySettingsWithDraft(form, profile.id, draft, isNew);
-  const validationError = isAggregateRelayProfile(draft)
-    ? aggregateRelayProfileValidation(draft)
-    : relayModelRoutesSettingsValidation(validationSettings);
+  const validationError = relaySessionProviderValidation(draft)
+    ?? (isAggregateRelayProfile(draft)
+      ? aggregateRelayProfileValidation(draft)
+      : relayModelRoutesSettingsValidation(validationSettings));
   const draftWithModelRows = () => {
     const serializedRows = serializeModelWindowRows(modelWindowRows);
     return { ...draft, modelList: serializedRows.modelList, modelWindows: serializedRows.modelWindows, modelVlm: serializedRows.modelVlm };
@@ -6596,7 +6815,7 @@ function RelayProfileDetail({
     const next = normalizeSettings(isNew
       ? addRelayProfile(form, normalizedDraft)
       : updateRelayProfile(form, profile.id, normalizedDraft));
-    const settingsValidationError = relayModelRoutesSettingsValidation(next);
+    const settingsValidationError = relaySettingsValidation(next);
     if (settingsValidationError) return;
     const activeLiveBaseUrl = codexBaseUrlFromConfig(
       relayFiles?.configContents ?? profile.configContents,
@@ -6783,6 +7002,8 @@ function RelayProfileEditor({
   }
 
   const showApiFields = profile.relayMode !== "official" || profile.officialMixApiKey;
+  const sessionProvider = relaySessionProvider(profile);
+  const canUseOpenAiSessionProvider = profile.relayMode !== "official" || profile.officialMixApiKey;
   const goalsFeatureState = codexGoalsFeatureState(
     profile.configContents,
     form.relayCommonConfigContents,
@@ -6977,6 +7198,27 @@ function RelayProfileEditor({
                   Chat Completions
                 </button>
               </div>
+            </Field>
+            <Field className="relay-field-session-provider" label={t("Codex 会话身份")}>
+              <AppSelect
+                value={sessionProvider}
+                onChange={(value) => updateDraft({ sessionProvider: value })}
+                options={[
+                  { value: "custom", label: t("Custom（默认）") },
+                  {
+                    value: "openai",
+                    label: t("OpenAI（兼容 ChatGPT Remote）"),
+                    disabled: !canUseOpenAiSessionProvider || profile.protocol !== "responses",
+                  },
+                ]}
+              />
+              <p className="field-hint">
+                {profile.protocol !== "responses"
+                  ? t("OpenAI 会话身份需要 Responses API；Chat Completions 不支持远程压缩。")
+                  : canUseOpenAiSessionProvider
+                    ? t("选择 OpenAI 后，Codex Remote 会把当前会话识别为 ChatGPT 会话；中转仍使用 custom 表。")
+                    : t("官方登录未混入 API 时不写入会话 provider")}
+              </p>
             </Field>
             <Field className="relay-field-sub2api" label="Sub2API">
               <div className="sub2api-field">
@@ -7250,6 +7492,7 @@ function AggregateRelayProfileEditor({
   const candidates = aggregateMemberCandidates(form, profile.id);
   const aggregate = normalizeAggregateConfig(profile.aggregate, candidates);
   const memberIds = new Set(aggregate.members.map((member) => member.profileId));
+  const sessionProvider = normalizeRelaySessionProvider(profile.sessionProvider);
   const updateAggregate = (nextAggregate: RelayAggregateConfig) => {
     onProfileChange(normalizeAggregateRelayProfile({ ...profile, aggregate: nextAggregate }, form));
   };
@@ -7292,6 +7535,19 @@ function AggregateRelayProfileEditor({
             onChange={(value) => updateAggregate({ ...aggregate, strategy: value })}
             options={aggregateStrategyOptions.map((option) => ({ value: option.value, label: option.label }))}
           />
+        </Field>
+        <Field className="relay-field-session-provider" label={t("Codex 会话身份")}>
+          <AppSelect
+            value={sessionProvider}
+            onChange={(value) => onProfileChange(normalizeAggregateRelayProfile({ ...profile, sessionProvider: value }, form))}
+            options={[
+              { value: "custom", label: t("Custom（默认）") },
+              { value: "openai", label: t("OpenAI（兼容 ChatGPT Remote）") },
+            ]}
+          />
+          <p className="field-hint">
+            {t("聚合请求仍由本地 Responses 代理轮转成员；OpenAI 身份用于让 ChatGPT Remote 识别会话。")}
+          </p>
         </Field>
       </div>
       <div className="aggregate-strategy-grid">
@@ -7905,6 +8161,11 @@ function formatBytes(bytes: number) {
   return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
 }
 
+function formatProgressPercent(value: number): string {
+  if (!Number.isFinite(value)) return "0.00";
+  return Math.min(100, Math.max(0, value)).toFixed(2);
+}
+
 function GuideList({ items }: { items: string[] }) {
   return (
     <div className="guide-list">
@@ -8167,7 +8428,7 @@ function TaskProgressBox({ progress, title, completedTitle = t("上次修复结�
     <div className="provider-sync-progress task-progress" data-active={progress.active}>
       <div className="provider-sync-progress-head">
         <strong>{progress.active ? title : completedTitle}</strong>
-        <span>{progress.percent}%</span>
+        <span>{formatProgressPercent(progress.percent)}%</span>
       </div>
       <div
         aria-valuemax={100}
@@ -8347,6 +8608,44 @@ function ScriptRow({ script, actions }: { script: NonNullable<UserScriptInventor
   );
 }
 
+function AdGrid({ ads, empty, actions }: { ads: AdItem[]; empty: string; actions: Actions }) {
+  if (!ads.length) return <div className="empty">{empty}</div>;
+  return (
+    <div className="ad-grid">
+      {ads.map((ad) => (
+        <button className="ad-card" key={ad.id || `${ad.type}-${ad.title}`} onClick={() => void actions.openExternalUrl(ad.url)} type="button">
+          {ad.image ? <img alt="" className="ad-image" src={ad.image} /> : null}
+          <div className="ad-content">
+            <strong>{formatAdTitle(ad.title)}</strong>
+            <p>{ad.description}</p>
+          </div>
+          {ad.highlights?.length ? (
+            <div className="ad-tags">
+              {ad.highlights.map((item) => (
+                <span key={item}>{item}</span>
+              ))}
+            </div>
+          ) : null}
+          <span className="ad-link">
+            {t("打开")}
+            <ExternalLink className="h-4 w-4" />
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function formatAdTitle(title: string) {
+  return title.split(/[｜|]/, 1)[0].trim() || title;
+}
+
+function isExpiredAd(ad: AdItem) {
+  if (!ad.expires_at) return false;
+  const expiresAt = Date.parse(ad.expires_at);
+  return Number.isFinite(expiresAt) && expiresAt < Date.now();
+}
+
 function routeTitle(route: Route) {
   return routes.find((item) => item.id === route)?.label ?? t("概览");
 }
@@ -8363,6 +8662,7 @@ function routeSubtitle(route: Route) {
     dreamSkin: t("Codex-Dream-Skin 风格主题和换图"),
     zedRemote: t("管理 Codex SSH 项目并加入 Zed workspace"),
     userScripts: t("内置和用户自定义脚本清单"),
+    recommendations: t("赞助商推荐与普通推荐"),
     maintenance: t("入口安装、修复、Watcher 与手动启动"),
     about: t("版本信息、项目链接、GitHub Release 更新、日志与诊断"),
     settings: t("主题和启动参数"),
@@ -9047,6 +9347,7 @@ function normalizeSettings(settings: BackendSettings): BackendSettings {
             apiKey: settings.relayApiKey || "",
             protocol: "responses" as RelayProtocol,
             relayMode: "official" as RelayMode,
+            sessionProvider: "custom" as RelaySessionProvider,
             officialMixApiKey: false,
             hideOfficialUsageAlert: false,
             testModel: "",
@@ -9131,6 +9432,7 @@ function normalizeRelayProfile(profile: RelayProfile, defaultContextSelection = 
         apiKey: "",
         protocol: "responses",
         relayMode: "aggregate",
+        sessionProvider: normalizeRelaySessionProvider(profile.sessionProvider),
         officialMixApiKey: false,
         hideOfficialUsageAlert: false,
         testModel: profile.testModel || "",
@@ -9162,6 +9464,7 @@ function normalizeRelayProfile(profile: RelayProfile, defaultContextSelection = 
     apiKey: profile.apiKey || "",
     protocol: profile.protocol === "chatCompletions" ? "chatCompletions" : "responses",
     relayMode,
+    sessionProvider: relaySessionProvider(profile),
     officialMixApiKey,
     hideOfficialUsageAlert: profile.hideOfficialUsageAlert === true,
     testModel: profile.testModel || "",
@@ -9191,6 +9494,7 @@ function hydrateAggregateRelayProfile(profile: RelayProfile, aggregate: Aggregat
     ...profile,
     name: profile.name || aggregate.name,
     relayMode: "aggregate",
+    sessionProvider: normalizeRelaySessionProvider(aggregate.sessionProvider),
     aggregate: {
       strategy: aggregate.strategy,
       members: aggregate.members.map((member) => ({
@@ -9224,6 +9528,19 @@ function normalizeRelayMode(mode: RelayMode | undefined): RelayMode {
   if (mode === "aggregate") return mode;
   if (mode === "pureApi") return mode;
   return "official";
+}
+
+function normalizeRelaySessionProvider(value: string | undefined): RelaySessionProvider {
+  return value === "openai" ? "openai" : "custom";
+}
+
+function relaySessionProviderFromConfig(contents: string): RelaySessionProvider {
+  return normalizeRelaySessionProvider(rootTomlStringValue(contents, "model_provider"));
+}
+
+function relaySessionProvider(profile: Pick<RelayProfile, "configContents" | "sessionProvider">): RelaySessionProvider {
+  const fromConfig = relaySessionProviderFromConfig(profile.configContents);
+  return fromConfig === "openai" || profile.sessionProvider === "openai" ? "openai" : "custom";
 }
 
 function normalizeContextSelection(
@@ -9356,20 +9673,22 @@ function withGeneratedRelayFiles(profile: RelayProfile): RelayProfile {
   }
   return {
     ...profile,
-    configContents: buildRelayConfigToml(profile, { includeBearerToken: false, requiresOpenAiAuth: false }),
+    configContents: buildRelayConfigToml(profile, { includeBearerToken: false, requiresOpenAiAuth: true }),
     authContents: buildRelayAuthJson(profile),
   };
 }
 
 function buildRelayConfigToml(
-  profile: Pick<RelayProfile, "model" | "baseUrl" | "upstreamBaseUrl" | "apiKey" | "protocol">,
+  profile: Pick<RelayProfile, "model" | "baseUrl" | "upstreamBaseUrl" | "apiKey" | "protocol" | "sessionProvider">,
   options: { includeBearerToken: boolean; requiresOpenAiAuth?: boolean },
 ): string {
   const baseUrl = profile.protocol === "chatCompletions" ? PROTOCOL_PROXY_BASE_URL : profile.baseUrl.trim();
   const apiKey = profile.apiKey.trim();
+  const sessionProvider = normalizeRelaySessionProvider(profile.sessionProvider);
   const rootLines = [
     profile.model.trim() ? `model = "${tomlString(profile.model.trim())}"` : null,
-    'model_provider = "custom"',
+    `model_provider = "${sessionProvider}"`,
+    sessionProvider === "openai" ? `openai_base_url = "${PROTOCOL_PROXY_BASE_URL}"` : null,
     "",
   ].filter((line): line is string => line !== null);
   return [
@@ -9419,6 +9738,7 @@ function deriveRelayProfileFromFiles(profile: RelayProfile): RelayProfile {
   return {
     ...profile,
     model,
+    sessionProvider: relaySessionProviderFromConfig(configContents),
     baseUrl: upstreamBaseUrl,
     upstreamBaseUrl,
     apiKey: profile.relayMode === "official"
@@ -9445,6 +9765,13 @@ function applyRelayProfilePatchToFiles(
   const needsAuthFile = next.relayMode === "pureApi";
   if (options.allowGenerateFiles && shouldHaveFiles && (!next.configContents.trim() || (needsAuthFile && !next.authContents.trim()))) {
     next = withGeneratedRelayFiles(next);
+  }
+
+  if ("sessionProvider" in patch) {
+    const sessionProvider = normalizeRelaySessionProvider(patch.sessionProvider);
+    next.sessionProvider = sessionProvider;
+    next.configContents = setRootTomlStringKey(next.configContents, "model_provider", sessionProvider);
+    next.configContents = setManagedOpenAiBaseUrl(next.configContents, sessionProvider === "openai");
   }
 
   if ("model" in patch) {
@@ -9538,6 +9865,7 @@ function codexProviderStringFromConfig(contents: string, key: string): string {
   const lines = contents.split(/\r?\n/);
   let currentSection = "";
   const matches: string[] = [];
+  const providerMatches: string[] = [];
 
   for (const line of lines) {
     const section = tomlSectionName(line);
@@ -9548,10 +9876,12 @@ function codexProviderStringFromConfig(contents: string, key: string): string {
     const value = tomlStringAssignmentValue(line, key);
     if (value === null) continue;
     if (targetSection && currentSection === targetSection) return value;
-    if (!currentSection || !currentSection.startsWith("model_providers.")) matches.push(value);
+    if (currentSection.startsWith("model_providers.")) providerMatches.push(value);
+    else matches.push(value);
   }
 
-  return matches.length === 1 ? matches[0] : "";
+  if (matches.length === 1) return matches[0];
+  return providerMatches.length === 1 ? providerMatches[0] : "";
 }
 
 function codexApiKeyFromAuth(contents: string): string {
@@ -9611,6 +9941,16 @@ function setRootTomlStringKey(contents: string, key: string, value: string): str
   return setRootTomlLine(contents, key, `${key} = "${tomlString(trimmed)}"`);
 }
 
+function setManagedOpenAiBaseUrl(contents: string, enabled: boolean): string {
+  const current = rootTomlStringValue(contents, "openai_base_url");
+  if (enabled) {
+    return !current || current === PROTOCOL_PROXY_BASE_URL
+      ? setRootTomlStringKey(contents, "openai_base_url", PROTOCOL_PROXY_BASE_URL)
+      : contents;
+  }
+  return current === PROTOCOL_PROXY_BASE_URL ? removeRootTomlKey(contents, "openai_base_url") : contents;
+}
+
 function setRootTomlIntKey(contents: string, key: string, value: string): string {
   const trimmed = value.replace(/[^\d]/g, "");
   if (!trimmed) return removeRootTomlKey(contents, key);
@@ -9664,10 +10004,11 @@ function setCodexProviderStringKey(
   value: string,
   options: { requiresOpenAiAuth?: boolean } = {},
 ): string {
-  const provider = rootTomlStringValue(contents, "model_provider") || "custom";
+  const sessionProvider = rootTomlStringValue(contents, "model_provider") || "custom";
+  const provider = sessionProvider === "openai" ? "custom" : sessionProvider;
   let next = contents;
   if (!rootTomlStringValue(next, "model_provider")) {
-    next = setRootTomlStringKey(next, "model_provider", provider);
+    next = setRootTomlStringKey(next, "model_provider", sessionProvider);
   }
   next = ensureCodexProviderDefaults(next, provider, { requiresOpenAiAuth: options.requiresOpenAiAuth !== false });
   return setTomlSectionStringKey(next, `model_providers.${provider}`, key, value);
@@ -9681,7 +10022,8 @@ function setCodexExperimentalBearerToken(contents: string, apiKey: string): stri
 }
 
 function removeCodexExperimentalBearerToken(contents: string): string {
-  const provider = rootTomlStringValue(contents, "model_provider") || "custom";
+  const sessionProvider = rootTomlStringValue(contents, "model_provider") || "custom";
+  const provider = sessionProvider === "openai" ? "custom" : sessionProvider;
   return removeTomlSectionKey(contents, `model_providers.${provider}`, "experimental_bearer_token");
 }
 
@@ -9757,6 +10099,8 @@ function removeTomlSectionKey(contents: string, sectionName: string, key: string
 }
 
 function relayProfileSwitchValidation(profile: RelayProfile, settings: BackendSettings | null = null): string | null {
+  const sessionProviderError = relaySessionProviderValidation(profile);
+  if (sessionProviderError) return sessionProviderError;
   if (isAggregateRelayProfile(profile)) {
     return aggregateRelayProfileValidation(profile);
   }
@@ -9779,6 +10123,21 @@ function relayModelRoutesSettingsValidation(settings: BackendSettings): string |
   return relayModelRouteIssueMessage(
     findRelayModelRouteIssue(settings.relayProfiles, settings.relayProfiles),
   );
+}
+
+function relaySettingsValidation(settings: BackendSettings): string | null {
+  for (const profile of settings.relayProfiles) {
+    const sessionProviderError = relaySessionProviderValidation(profile);
+    if (sessionProviderError) return sessionProviderError;
+  }
+  return relayModelRoutesSettingsValidation(settings);
+}
+
+function relaySessionProviderValidation(profile: RelayProfile): string | null {
+  if (relaySessionProvider(profile) === "openai" && profile.protocol !== "responses") {
+    return t("OpenAI 会话身份仅支持 Responses API；Chat Completions 不支持 ChatGPT Remote 的远程压缩。请切换协议或改回 Custom。");
+  }
+  return null;
 }
 
 function relayModelRouteIssueMessage(issue: ReturnType<typeof findRelayModelRouteIssue>): string | null {
@@ -9859,6 +10218,7 @@ function normalizeAggregateProfilesFromRelayProfiles(profiles: RelayProfile[]): 
     return {
       id: profile.id,
       name: profile.name || t("聚合供应商"),
+      sessionProvider: normalizeRelaySessionProvider(profile.sessionProvider),
       strategy: aggregate.strategy,
       members: aggregate.members.map((member) => ({
         relayId: member.profileId,
@@ -9897,6 +10257,7 @@ function createRelayProfile(settings: BackendSettings): RelayProfile {
     apiKey: "",
     protocol: "responses" as RelayProtocol,
     relayMode: "official" as RelayMode,
+    sessionProvider: "custom" as RelaySessionProvider,
     officialMixApiKey: false,
     hideOfficialUsageAlert: false,
     testModel: "",
@@ -9935,6 +10296,7 @@ function createAggregateRelayProfile(settings: BackendSettings): RelayProfile {
       apiKey: "",
       protocol: "responses",
       relayMode: "aggregate",
+      sessionProvider: "custom",
       officialMixApiKey: false,
       hideOfficialUsageAlert: false,
       testModel: "",
@@ -10075,6 +10437,7 @@ function normalizeAggregateRelayProfile(profile: RelayProfile, settings: Backend
     apiKey: "",
     protocol: "responses",
     relayMode: "aggregate",
+    sessionProvider: normalizeRelaySessionProvider(profile.sessionProvider),
     officialMixApiKey: false,
     hideOfficialUsageAlert: false,
     configContents: "",
