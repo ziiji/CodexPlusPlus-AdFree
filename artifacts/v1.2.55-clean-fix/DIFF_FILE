@@ -1,0 +1,97 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 58e83bf..2087563 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -418,7 +418,7 @@ dependencies = [
+
+ [[package]]
+ name = "codex-plus-core"
+-version = "1.2.54"
++version = "1.2.55"
+ dependencies = [
+  "aes-gcm",
+  "anyhow",
+@@ -448,7 +448,7 @@ dependencies = [
+
+ [[package]]
+ name = "codex-plus-data"
+-version = "1.2.54"
++version = "1.2.55"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -465,7 +465,7 @@ dependencies = [
+
+ [[package]]
+ name = "codex-plus-launcher"
+-version = "1.2.54"
++version = "1.2.55"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -479,7 +479,7 @@ dependencies = [
+
+ [[package]]
+ name = "codex-plus-manager"
+-version = "1.2.54"
++version = "1.2.55"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+diff --git a/Cargo.toml b/Cargo.toml
+index c6ff31d..0f2fc5d 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -8,7 +8,7 @@ members = [
+ ]
+
+ [workspace.package]
+-version = "1.2.54"
++version = "1.2.55"
+ edition = "2024"
+ license = "AGPL-3.0-only"
+ repository = "https://github.com/BigPizzaV3/CodexPlusPlus"
+diff --git a/apps/codex-plus-manager/package-lock.json b/apps/codex-plus-manager/package-lock.json
+index b0c60f9..299fef5 100644
+--- a/apps/codex-plus-manager/package-lock.json
++++ b/apps/codex-plus-manager/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "codex-plus-manager",
+-  "version": "1.2.54",
++  "version": "1.2.55",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "codex-plus-manager",
+-      "version": "1.2.54",
++      "version": "1.2.55",
+       "license": "AGPL-3.0-only",
+       "dependencies": {
+         "@dnd-kit/core": "^6.3.1",
+diff --git a/apps/codex-plus-manager/package.json b/apps/codex-plus-manager/package.json
+index a962ef5..586e732 100644
+--- a/apps/codex-plus-manager/package.json
++++ b/apps/codex-plus-manager/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "codex-plus-manager",
+-  "version": "1.2.54",
++  "version": "1.2.55",
+   "private": true,
+   "license": "AGPL-3.0-only",
+   "type": "module",
+diff --git a/apps/codex-plus-manager/src-tauri/tauri.conf.json b/apps/codex-plus-manager/src-tauri/tauri.conf.json
+index e173de8..458385f 100644
+--- a/apps/codex-plus-manager/src-tauri/tauri.conf.json
++++ b/apps/codex-plus-manager/src-tauri/tauri.conf.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "https://schema.tauri.app/config/2",
+   "productName": "Codex++ Manager",
+-  "version": "1.2.54",
++  "version": "1.2.55",
+   "identifier": "com.bigpizzav3.codexplusplus.manager",
+   "build": {
+     "beforeDevCommand": "npm run vite:dev",

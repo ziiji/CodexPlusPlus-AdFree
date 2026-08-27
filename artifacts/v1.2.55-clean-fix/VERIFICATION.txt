@@ -1,0 +1,22 @@
+CHANGED BRANCH/FIELD: codex/v1.2.55-clean-fix; Cargo workspace, Cargo.lock, Tauri, package.json and package-lock version fields changed from 1.2.54 to upstream 1.2.55.
+
+BASELINE command: npm test; npm run check; node --check assets/inject/renderer-inject.js; node tools/i18n-verify.mjs
+BASELINE input: commit 43bcc0c with internal package version 1.2.54.
+BASELINE literal output/result: codex-plus-manager@1.2.54; tests 116; pass 116; fail 0; tsc exit 0; Dictionary matches every t()/tf() call site exactly.
+BASELINE exit status: 0.
+
+MODIFIED command: npm test; npm run check; npm run vite:build; node --check assets/inject/renderer-inject.js; node tools/i18n-verify.mjs; git diff --check
+MODIFIED input: clean working tree patch with every package version field set to 1.2.55.
+MODIFIED literal output/result: codex-plus-manager@1.2.55; tests 116; pass 116; fail 0; tsc exit 0; 1620 modules transformed; built in 3.50s; Dictionary matches every t()/tf() call site exactly.
+MODIFIED exit status: 0.
+
+ROLLBACK command: Copy-Item MODIFIED_FILE to C:\Users\phoenix\AppData\Local\Temp\codexpp-rollback-38aa06d3-daef-4947-bd0e-03925ed97cb6.toml; replace version = "1.2.55" with version = "1.2.54".
+ROLLBACK input: a separate copy of MODIFIED_FILE; the working tree is not touched.
+ROLLBACK literal output/result: ROLLBACK PASS: C:\Users\phoenix\AppData\Local\Temp\codexpp-rollback-38aa06d3-daef-4947-bd0e-03925ed97cb6.toml restored version = 1.2.54
+ROLLBACK exit status: 0.
+RESTORED behavior/status: the rollback copy reports 1.2.54; MODIFIED_FILE and the working tree remain at upstream version 1.2.55.
+
+MODIFIED_FILE: D:\vibe coding\codexpp\artifacts\v1.2.55-clean-fix\MODIFIED_FILE
+DIFF_FILE: D:\vibe coding\codexpp\artifacts\v1.2.55-clean-fix\DIFF_FILE
+VERIFICATION.txt: D:\vibe coding\codexpp\artifacts\v1.2.55-clean-fix\VERIFICATION.txt
+ROLLBACK.sh: D:\vibe coding\codexpp\artifacts\v1.2.55-clean-fix\ROLLBACK.sh
