@@ -113,8 +113,12 @@ fn dream_skin_target_runtime_script(settings: &BackendSettings, include_art: boo
     let (engine, renderer, base_css) = dream_skin_target_assets(settings);
     let managed_css = managed_dream_skin_css(settings);
     let css = format!("{base_css}\n{managed_css}");
-    let theme = serde_json::to_string(&settings.codex_app_dream_skin_theme_config)
-        .expect("dream skin target theme should serialize");
+    let theme = serde_json::to_string(
+        &settings
+            .codex_app_dream_skin_theme_config
+            .without_promotional_fields(),
+    )
+    .expect("dream skin target theme should serialize");
     let style_revision = dream_skin_content_signature(css.as_bytes());
     let payload_revision =
         dream_skin_target_payload_signature(settings, engine, &style_revision, &theme);
@@ -397,7 +401,9 @@ pub fn injection_script_with_settings(helper_port: u16, settings: &BackendSettin
     let image_overlay = image_overlay_config(helper_port, settings);
     let dream_skin_art = dream_skin_art_data_uri(settings);
     let dream_skin_art_signature = dream_skin_art_content_signature(settings);
-    let dream_skin_theme = &settings.codex_app_dream_skin_theme_config;
+    let dream_skin_theme = settings
+        .codex_app_dream_skin_theme_config
+        .without_promotional_fields();
     let dream_skin_target_runtime = dream_skin_target_runtime_script(settings, false);
     let plugin_marketplaces = local_plugin_marketplaces();
     let paste_fix = paste_fix_enabled_config(settings);
@@ -422,7 +428,7 @@ pub fn injection_script_with_settings(helper_port: u16, settings: &BackendSettin
         serde_json::to_string(&dream_skin_art).expect("dream skin art should serialize"),
         serde_json::to_string(&dream_skin_art_signature)
             .expect("dream skin art signature should serialize"),
-        serde_json::to_string(dream_skin_theme).expect("dream skin theme should serialize"),
+        serde_json::to_string(&dream_skin_theme).expect("dream skin theme should serialize"),
         serde_json::to_string(&paste_fix).expect("paste fix config should serialize"),
         serde_json::to_string(&force_chinese_locale)
             .expect("force Chinese locale config should serialize"),
@@ -463,8 +469,12 @@ pub fn dream_skin_art_content_signature(settings: &BackendSettings) -> String {
 
 pub fn dream_skin_runtime_content_signature(settings: &BackendSettings) -> String {
     let (engine, _, css) = dream_skin_target_assets(settings);
-    let theme = serde_json::to_string(&settings.codex_app_dream_skin_theme_config)
-        .expect("dream skin target theme should serialize");
+    let theme = serde_json::to_string(
+        &settings
+            .codex_app_dream_skin_theme_config
+            .without_promotional_fields(),
+    )
+    .expect("dream skin target theme should serialize");
     let style_revision = dream_skin_content_signature(css.as_bytes());
     dream_skin_target_payload_signature(settings, engine, &style_revision, &theme)
 }
