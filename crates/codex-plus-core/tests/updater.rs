@@ -1,8 +1,18 @@
 use codex_plus_core::update::{
-    Release, download_asset_to, is_newer_version, parse_version_tag, release_from_github_payload,
-    release_from_latest_json_payload, safe_asset_name, select_update_asset,
+    DEFAULT_LATEST_JSON_URL, DEFAULT_REPOSITORY, Release, download_asset_to, is_newer_version,
+    parse_version_tag, release_from_github_payload, release_from_latest_json_payload,
+    safe_asset_name, select_update_asset,
 };
 use serde_json::json;
+
+#[test]
+fn default_update_source_uses_ad_free_repository() {
+    assert_eq!(DEFAULT_REPOSITORY, "ziiji/CodexPlusPlus-AdFree");
+    assert_eq!(
+        DEFAULT_LATEST_JSON_URL,
+        "https://github.com/ziiji/CodexPlusPlus-AdFree/releases/latest/download/latest.json"
+    );
+}
 
 #[test]
 fn parse_version_tag_accepts_prefix_and_suffix() {

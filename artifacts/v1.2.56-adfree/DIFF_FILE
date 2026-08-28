@@ -1,0 +1,1497 @@
+diff --git a/apps/codex-plus-manager/src/App.tsx b/apps/codex-plus-manager/src/App.tsx
+index c6ca522..4fca108 100644
+--- a/apps/codex-plus-manager/src/App.tsx
++++ b/apps/codex-plus-manager/src/App.tsx
+@@ -812,22 +812,6 @@ type UpdateResult = CommandResult<{
+   progress?: number;
+ }>;
+
+-type AdItem = {
+-  id?: string;
+-  type: "sponsor" | "normal" | string;
+-  title: string;
+-  description: string;
+-  url: string;
+-  image?: string;
+-  highlights?: string[];
+-  expires_at?: string;
+-};
+-
+-type AdsResult = CommandResult<{
+-  version: number;
+-  ads: AdItem[];
+-}>;
+-
+ type ScriptMarketItem = {
+   id: string;
+   name: string;
+@@ -965,7 +949,7 @@ type StartupResult = CommandResult<{
+   showUpdate: boolean;
+ }>;
+
+-type Route = "overview" | "relay" | "grok" | "relayEnvironment" | "sessions" | "context" | "skills" | "weixin" | "enhance" | "dreamSkin" | "zedRemote" | "userScripts" | "recommendations" | "maintenance" | "about" | "settings";
++type Route = "overview" | "relay" | "grok" | "relayEnvironment" | "sessions" | "context" | "skills" | "weixin" | "enhance" | "dreamSkin" | "zedRemote" | "userScripts" | "maintenance" | "about" | "settings";
+ type Theme = "dark" | "light";
+
+ const routes: Array<{ id: Route; label: string; icon: LucideIcon; badge?: string }> = [
+@@ -980,7 +964,6 @@ const routes: Array<{ id: Route; label: string; icon: LucideIcon; badge?: string
+   { id: "zedRemote", label: t("Zed 远程项目"), icon: ExternalLink },
+   { id: "skills", label: t("Skills 技能"), icon: BookOpen },
+   { id: "userScripts", label: t("脚本市场"), icon: FileCode2 },
+-  { id: "recommendations", label: t("推荐内容"), icon: ExternalLink },
+   { id: "maintenance", label: t("安装维护"), icon: Wrench },
+   { id: "about", label: t("关于"), icon: Info },
+   { id: "settings", label: t("设置"), icon: Settings },
+@@ -998,7 +981,7 @@ const navigationSections: Array<{ label: string; routes: Route[]; placement?: "b
+   },
+   {
+     label: t("系统"),
+-    routes: ["recommendations", "maintenance", "about", "settings"],
++    routes: ["maintenance", "about", "settings"],
+     placement: "bottom",
+   },
+ ];
+@@ -1154,7 +1137,6 @@ export function App() {
+     percent: 0,
+     message: t("尚未运行安装包更新。"),
+   });
+-  const [ads, setAds] = useState<AdsResult | null>(null);
+   const [scriptMarket, setScriptMarket] = useState<ScriptMarketResult | null>(null);
+   const [skills, setSkills] = useState<SkillsResult | null>(null);
+   const [skillBusyId, setSkillBusyId] = useState<string | null>(null);
+@@ -2185,7 +2167,6 @@ export function App() {
+       await refreshScriptMarket(true);
+       await refreshUserScriptInventory();
+     }
+-    if (next === "recommendations") await refreshAds(true);
+     if (next === "about") {
+       await refreshOverview(true);
+       await refreshLogs(true);
+@@ -2583,14 +2564,6 @@ export function App() {
+     }
+   };
+
+-  const refreshAds = async (silent = false) => {
+-    const result = await run(() => call<AdsResult>("load_ads"));
+-    if (result) {
+-      setAds(result);
+-      if (!silent) showResultNotice(t("推荐内容"), result, { silentSuccess: true });
+-    }
+-  };
+-
+   const refreshProviderSyncTargets = async (silent = false) => {
+     const result = await run(() => call<ProviderSyncTargetsResult>("load_provider_sync_targets"));
+     if (result) {
+@@ -3378,7 +3351,6 @@ export function App() {
+       resetCcsDbPath,
+       refreshLiveContextEntries,
+       syncLiveContextEntries,
+-      refreshAds,
+       refreshScriptMarket,
+       refreshUserScriptInventory,
+       installMarketScript,
+@@ -3633,7 +3605,6 @@ export function App() {
+             <ZedRemoteScreen projects={zedRemoteProjects} form={settingsForm} onFormChange={setSettingsForm} actions={actions} />
+           ) : null}
+           {route === "userScripts" ? <UserScriptsScreen settings={settings} market={scriptMarket} actions={actions} /> : null}
+-          {route === "recommendations" ? <RecommendationsScreen ads={ads} actions={actions} /> : null}
+           {route === "maintenance" ? (
+             <MaintenanceScreen
+               overview={overview}
+@@ -3797,7 +3768,6 @@ type Actions = {
+   resetCcsDbPath: () => Promise<void>;
+   refreshLiveContextEntries: () => Promise<LiveContextEntriesResult | null>;
+   syncLiveContextEntries: (settings: BackendSettings, silent?: boolean) => Promise<LiveContextEntriesResult | null>;
+-  refreshAds: () => Promise<void>;
+   refreshScriptMarket: () => Promise<void>;
+   refreshUserScriptInventory: () => Promise<SettingsResult | null>;
+   installMarketScript: (id: string) => Promise<void>;
+@@ -4328,40 +4298,6 @@ function OverviewScreen({
+   const health = healthItems(overview);
+   return (
+     <>
+-      <Panel className="jojocode-overview">
+-        <CardContent>
+-          <div className="jojocode-overview-layout">
+-            <div className="jojocode-overview-main">
+-              <div className="jojocode-overview-mark">
+-                <Network className="h-5 w-5" />
+-              </div>
+-              <div>
+-                <span className="eyebrow">{t("项目赞助商")}</span>
+-                <h2>JOJO Code</h2>
+-                <p>
+-                  {t("JOJO Code 提供稳定、价格合理的 API 中转服务，支持 GPT-5.6 全系列、Fable 5、Sonnet 5、GPT-5.5、GPT-5.4、Claude Opus 4.8、Claude Opus 4.7、gpt-image-2 等模型与图像能力。")}
+-                </p>
+-              </div>
+-            </div>
+-            <div className="jojocode-overview-side">
+-              <div className="jojocode-model-tags">
+-                <span>GPT-5.6 全系列</span>
+-                <span>Fable 5</span>
+-                <span>Sonnet 5</span>
+-                <span>GPT-5.5</span>
+-                <span>GPT-5.4</span>
+-                <span>Opus 4.8</span>
+-                <span>Opus 4.7</span>
+-                <span>gpt-image-2</span>
+-              </div>
+-              <Button onClick={() => void actions.openExternalUrl("https://jojocode.com/")}>
+-                <ExternalLink className="h-4 w-4" />
+-                {t("打开 JOJO Code")}
+-              </Button>
+-            </div>
+-          </div>
+-        </CardContent>
+-      </Panel>
+       <Panel>
+         <CardHead title={t("健康检查")} detail={t("概览只展示关键问题，具体配置在对应页面处理")} />
+         <CardContent>
+@@ -5179,7 +5115,7 @@ function EnhanceScreen({
+             <FeatureGroup title={t("插件与模型")} detail={t("管理插件市场、模型列表和服务档位相关增强。")}>
+               <FeatureToggle title={t("插件市场解锁")} detail={t("API Key 模式下扩展插件市场请求，尽量显示完整插件列表；官方/混合模式通常不需要。")} checked={form.codexAppPluginMarketplaceUnlock} disabled={!masterEnabled || !patchMode} onChange={(value) => setEnhanceFlag("codexAppPluginMarketplaceUnlock", value)} />
+               <FeatureToggle title={t("模型白名单解锁")} detail={t("从环境变量和 config.toml 的 /v1/models 拉取模型并补进模型列表。")} checked={form.codexAppModelWhitelistUnlock} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppModelWhitelistUnlock", value)} />
+-              <FeatureToggle title={t("Fast 按钮")} detail={t("显示服务模式切换按钮；Fast 仅支持 gpt-5.4 / gpt-5.5 / gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna，其他模型按 Standard 发送。")} checked={form.codexAppServiceTierControls} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppServiceTierControls", value)} />
++              <FeatureToggle title={t("Fast 按钮")} detail={t("显示服务模式切换按钮；Fast 仅支持 gpt-5.4 / gpt-5.5，其他模型按 Standard 发送。")} checked={form.codexAppServiceTierControls} disabled={!masterEnabled} onChange={(value) => setEnhanceFlag("codexAppServiceTierControls", value)} />
+               <div className="feature-action-row">
+                 <div>
+                   <strong>{t("官方远端插件缓存")}</strong>
+@@ -7111,43 +7047,6 @@ function SessionsScreen({
+   );
+ }
+
+-function RecommendationsScreen({ ads, actions }: { ads: AdsResult | null; actions: Actions }) {
+-  const items = (ads?.ads ?? []).filter((ad) => !isExpiredAd(ad));
+-  const sponsors = items.filter((ad) => ad.type === "sponsor");
+-  const normal = items.filter((ad) => ad.type === "normal");
+-  return (
+-    <>
+-      <Panel>
+-        <CardHead title={t("推荐内容")} detail={t("与 Codex 内插件菜单使用同一个远端广告源")} />
+-        <CardContent>
+-          <div className="recommend-hero">
+-            <div>
+-              <strong>{ads ? tf("已加载 {0} 条推荐", [items.length]) : t("尚未加载推荐内容")}</strong>
+-              <span>{t("内容来自 BigPizzaV3/Ad-List，分为赞助商推荐和普通推荐。")}</span>
+-            </div>
+-            <Button onClick={() => void actions.refreshAds()}>
+-              <RefreshCw className="h-4 w-4" />
+-              {t("刷新推荐")}
+-            </Button>
+-          </div>
+-        </CardContent>
+-      </Panel>
+-      <Panel>
+-        <CardHead title={t("赞助商推荐")} detail={tf("{0} 条", [sponsors.length])} />
+-        <CardContent>
+-          <AdGrid actions={actions} ads={sponsors} empty={t("暂无赞助商推荐。")} />
+-        </CardContent>
+-      </Panel>
+-      <Panel>
+-        <CardHead title={t("普通推荐")} detail={tf("{0} 条", [normal.length])} />
+-        <CardContent>
+-          <AdGrid actions={actions} ads={normal} empty={t("暂无普通推荐。")} />
+-        </CardContent>
+-      </Panel>
+-    </>
+-  );
+-}
+-
+ function MaintenanceScreen({
+   overview,
+   watcher,
+@@ -7290,14 +7189,14 @@ function AboutScreen({
+           <div className="metric-list">
+             <Metric label={t("Codex++ 版本")} value={overview?.current_version ?? update?.currentVersion ?? "-"} />
+             <Metric label={t("Codex 版本")} value={overview?.codex_version ?? t("未检测到")} />
+-            <Metric label={t("项目地址")} value="github.com/BigPizzaV3/CodexPlusPlus" />
++            <Metric label={t("项目地址")} value="github.com/ziiji/CodexPlusPlus-AdFree" />
+           </div>
+           <Toolbar>
+-            <Button onClick={() => void actions.openExternalUrl("https://github.com/BigPizzaV3/CodexPlusPlus")} variant="secondary">
++            <Button onClick={() => void actions.openExternalUrl("https://github.com/ziiji/CodexPlusPlus-AdFree")} variant="secondary">
+               <ExternalLink className="h-4 w-4" />
+               {t("打开项目主页")}
+             </Button>
+-            <Button onClick={() => void actions.openExternalUrl("https://github.com/BigPizzaV3/CodexPlusPlus/issues")} variant="secondary">
++            <Button onClick={() => void actions.openExternalUrl("https://github.com/ziiji/CodexPlusPlus-AdFree/issues")} variant="secondary">
+               <ExternalLink className="h-4 w-4" />
+               {t("反馈问题")}
+             </Button>
+@@ -10420,44 +10319,6 @@ function ScriptRow({ script, actions }: { script: NonNullable<UserScriptInventor
+   );
+ }
+
+-function AdGrid({ ads, empty, actions }: { ads: AdItem[]; empty: string; actions: Actions }) {
+-  if (!ads.length) return <div className="empty">{empty}</div>;
+-  return (
+-    <div className="ad-grid">
+-      {ads.map((ad) => (
+-        <button className="ad-card" key={ad.id || `${ad.type}-${ad.title}`} onClick={() => void actions.openExternalUrl(ad.url)} type="button">
+-          {ad.image ? <img alt="" className="ad-image" src={ad.image} /> : null}
+-          <div className="ad-content">
+-            <strong>{formatAdTitle(ad.title)}</strong>
+-            <p>{ad.description}</p>
+-          </div>
+-          {ad.highlights?.length ? (
+-            <div className="ad-tags">
+-              {ad.highlights.map((item) => (
+-                <span key={item}>{item}</span>
+-              ))}
+-            </div>
+-          ) : null}
+-          <span className="ad-link">
+-            {t("打开")}
+-            <ExternalLink className="h-4 w-4" />
+-          </span>
+-        </button>
+-      ))}
+-    </div>
+-  );
+-}
+-
+-function formatAdTitle(title: string) {
+-  return title.split(/[｜|]/, 1)[0].trim() || title;
+-}
+-
+-function isExpiredAd(ad: AdItem) {
+-  if (!ad.expires_at) return false;
+-  const expiresAt = Date.parse(ad.expires_at);
+-  return Number.isFinite(expiresAt) && expiresAt < Date.now();
+-}
+-
+ function routeTitle(route: Route) {
+   return routes.find((item) => item.id === route)?.label ?? t("概览");
+ }
+@@ -10476,7 +10337,6 @@ function routeSubtitle(route: Route) {
+     dreamSkin: t("Codex-Dream-Skin 风格主题和换图"),
+     zedRemote: t("管理 Codex SSH 项目并加入 Zed workspace"),
+     userScripts: t("内置和用户自定义脚本清单"),
+-    recommendations: t("赞助商推荐与普通推荐"),
+     maintenance: t("入口安装、修复、Watcher 与手动启动"),
+     about: t("版本信息、项目链接、GitHub Release 更新、日志与诊断"),
+     settings: t("主题和启动参数"),
+diff --git a/apps/codex-plus-manager/src/i18n-en.ts b/apps/codex-plus-manager/src/i18n-en.ts
+index f627333..c236c29 100644
+--- a/apps/codex-plus-manager/src/i18n-en.ts
++++ b/apps/codex-plus-manager/src/i18n-en.ts
+@@ -28,8 +28,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "Codex 意外停止": "Codex stopped unexpectedly",
+   "Codex 版本": "Codex version",
+   "Codex CLI 路径": "Codex CLI path",
+-  "JOJO Code 提供稳定、价格合理的 API 中转服务，支持 GPT-5.6 全系列、Fable 5、Sonnet 5、GPT-5.5、GPT-5.4、Claude Opus 4.8、Claude Opus 4.7、gpt-image-2 等模型与图像能力。":
+-    "JOJO Code provides a stable, competitively priced API relay supporting the full GPT-5.6 family, Fable 5, Sonnet 5, GPT-5.5, GPT-5.4, Claude Opus 4.8, Claude Opus 4.7, gpt-image-2 and other models plus image capabilities.",
+   "Codex++ 导入": "Codex++ import",
+   "Codex++ 版本": "Codex++ version",
+   "Codex-Dream-Skin 风格主题和换图": "Codex-Dream-Skin style themes and image replacement",
+@@ -91,7 +89,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "扫码后自动保存，也可粘贴已有 Bearer token": "Saved after QR login, or paste an existing Bearer token",
+   "允许的微信用户 ID": "Allowed WeChat user IDs",
+   "工作目录": "Working directory",
+-  "留空时使用管理器当前目录": "Leave empty to use the manager's current directory",
+   "选择工作目录": "Choose working directory",
+   "选择微信连接工作目录": "Choose WeChat connection working directory",
+   "搜索或输入工作目录": "Search or enter a working directory",
+@@ -289,7 +286,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "下一页": "Next page",
+   "下载并运行安装包": "Download and run installer",
+   "不写 API 文件": "Does not write API files",
+-  "与 Codex 内插件菜单使用同一个远端广告源": "Uses the same remote ad source as the in-Codex plugin menu",
+   "个": "",
+   "个会话": " session(s)",
+   "中国官方": "China official",
+@@ -340,7 +336,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "保存扩展项": "Save entry",
+   "保存的应用路径": "Saved app path",
+   "保存策略": "Save strategy",
+-  "保存自动修复设置": "Save auto-repair settings",
+   "保存设置": "Save settings",
+   "设置有修改时，保存后才会写入本地配置。": "Save to write changed settings to the local configuration.",
+   "修复历史会话": "Repair historical sessions",
+@@ -366,8 +361,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "关闭后本工具不会在手动切换时写入 Codex 的 config.toml / auth.json；启动 Codex 时始终不会自动改这些文件。":
+     "When off, this tool won't write Codex's config.toml / auth.json on manual switches; it never auto-modifies these files when launching Codex.",
+   "兼容增强": "Compatible enhancement",
+-  "内容来自 BigPizzaV3/Ad-List，分为赞助商推荐和普通推荐。":
+-    "Content comes from BigPizzaV3/Ad-List, split into sponsor recommendations and regular recommendations.",
+   "内置": "Built-in",
+   "内置、手动和市场安装脚本；可在这里启停或删除用户脚本": "Built-in, manual and marketplace-installed scripts; enable, disable or delete user scripts here",
+   "内置和用户自定义脚本清单": "Built-in and user-defined script inventory",
+@@ -396,7 +389,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "刷新列表": "Refresh list",
+   "刷新市场": "Refresh marketplace",
+   "刷新当前页面": "Refresh current page",
+-  "刷新推荐": "Refresh recommendations",
+   "刷新本地": "Refresh local",
+   "刷新项目": "Refresh projects",
+   "加入当前工作区": "Add to current workspace",
+@@ -408,7 +400,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "历史会话修复失败，请查看错误提示后重试。": "Historical session repair failed. Check the error message and retry.",
+   "历史会话修复进度": "Historical session repair progress",
+   "压缩上下文大小": "Compaction context size",
+-  "原生菜单栏位置": "Native menu bar placement",
+   "原生菜单汉化": "Native menu localization",
+   "反馈问题": "Report an issue",
+   "发现": "Discovered",
+@@ -473,7 +464,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "安装维护": "Install & maintenance",
+   "完整增强": "Full enhancement",
+   "官方": "Official",
+-  "项目赞助商": "Project sponsor",
+   "官方混入 API Key": "Official mixed-in API Key",
+   "官方混合 API 不应在 auth.json 中保存 OPENAI_API_KEY。请清理此供应商的 auth.json 后再切换。":
+     "Official mixed API should not store OPENAI_API_KEY in auth.json. Clear this provider's auth.json before switching.",
+@@ -482,7 +472,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "对话居中宽度": "Centered conversation width",
+   "导入 Codex++ 供应商": "Import Codex++ provider",
+   "尚未刷新": "Not refreshed yet",
+-  "尚未加载推荐内容": "Recommendations not loaded yet",
+   "尚未检查 Codex 应用路径。": "Codex app path not checked yet.",
+   "尚未检查 GitHub Release；更新会下载并启动安装包。": "GitHub Release not checked yet; updating downloads and launches the installer.",
+   "尚未生成诊断报告。": "No diagnostic report generated yet.",
+@@ -519,8 +508,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "应用路径留空时使用已保存路径；没有保存路径时使用自动探测": "When the app path is empty, the saved path is used; with no saved path, auto-detection is used",
+   "应用路径覆盖": "App path override",
+   "开启": "On",
+-  "开启后，通过 Codex++ 启动 Codex 前自动整理一次旧对话的归属标记。":
+-    "When on, tidies up ownership tags of old conversations once before launching Codex through Codex++.",
+   "强制中文界面": "Force Chinese UI",
+   "强制启用 Codex App 内置 zh-CN 语言包，避免 Statsig/VPN 不通时回退英文。需重启 Codex 才能完整生效。":
+     "Forces the Codex app's built-in zh-CN language pack to avoid falling back to English when Statsig/VPN is unreachable. Requires restarting Codex to fully apply.",
+@@ -540,7 +527,6 @@ export const EN_PLAIN: Record<string, string> = {
+     "Currently in use: backfilled from ~/.codex/auth.json when opened; saving stores it as this provider's auth archive",
+   "当前供应商 config.toml 里没有可提取的通用配置。": "The current provider's config.toml has no extractable common config.",
+   "当前供应商切换后会写入的预览；上下文开关变化会立即反映": "Preview of what the current provider writes after switching; context toggles are reflected immediately",
+-  "当前供应商还没有完整 config.toml / API Key 存档。": "The current provider doesn't have a complete config.toml / API Key archive yet.",
+   "当前共有": "There are currently ",
+   "当前未登录官方账号，也未配置混入 API 的 Base URL / Key。": "Not logged into an official account, and no mixed-in API Base URL / Key configured.",
+   "当前未登录官方账号；切到官方登录模式后仍需要先在 Codex/ChatGPT 登录。":
+@@ -561,14 +547,11 @@ export const EN_PLAIN: Record<string, string> = {
+   "或": " or ",
+   "手动": "Manual",
+   "手动启动": "Manual launch",
+-  "打开": "Open",
+-  "打开 JOJO Code": "Open JOJO Code",
+   "打开关于": "Open About",
+   "打开链接": "Open link",
+   "打开项目主页": "Open project homepage",
+   "扩展项": "entry",
+   "批量删除会话": "Bulk delete sessions",
+-  "把 Codex++ 菜单插入 Codex 顶部原生菜单栏。": "Insert the Codex++ menu into Codex's top native menu bar.",
+   "把主对话和输入框限制到固定最大宽度，适合大屏阅读。": "Constrain the main conversation and input box to a fixed max width, good for large-screen reading.",
+   "投稿": "Submit",
+   "拖动排序": "Drag to reorder",
+@@ -581,7 +564,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "按请求轮转会逐请求切换成员，适合供应商能力接近的场景。":
+     "Per-request round-robin switches members request by request, suited to providers with similar capabilities.",
+   "接入模式": "Access mode",
+-  "推荐内容": "Recommendations",
+   "提取当前供应商配置": "Extract current provider config",
+   "插件": "Plugins",
+   "插件市场修复": "Plugin marketplace repair",
+@@ -607,17 +589,14 @@ export const EN_PLAIN: Record<string, string> = {
+   "时间": "Time",
+   "桌宠跟随真实鼠标": "Real-mouse pet look",
+   "释放并注册内置缓存": "Extract and register embedded cache",
+-  "显示服务模式切换按钮；Fast 仅支持 gpt-5.4 / gpt-5.5 / gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna，其他模型按 Standard 发送。":
++  "显示服务模式切换按钮；Fast 仅支持 gpt-5.4 / gpt-5.5，其他模型按 Standard 发送。":
+     "Show the service-tier toggle button; Fast only supports gpt-5.4 / gpt-5.5, other models are sent as Standard.",
+-  "普通推荐": "Regular recommendations",
+   "多模态模型（支持图片输入的模型）请保持 send-as-is。": "Keep send-as-is for multimodal models that support image input.",
+   "暂无": "None",
+   "暂无启动状态。": "No launch status yet.",
+   "暂无描述。": "No description.",
+   "暂无日志。": "No logs.",
+-  "暂无普通推荐。": "No regular recommendations.",
+   "暂无状态文件": "No status file",
+-  "暂无赞助商推荐。": "No sponsor recommendations.",
+   "暂无项目。": "No projects.",
+   "更多选项": "More options",
+   "更新": "Update",
+@@ -660,7 +639,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "检查": "Check",
+   "检查与修复": "Check & repair",
+   "检查入口、Codex 应用和 Watcher 状态": "Check entrypoint, Codex app and watcher status",
+-  "检查配置、模型列表和一次真实请求，定位供应商不可用原因。": "Check configuration, model list and one real request to find why a provider is unavailable.",
+   "检查完成": "Check complete",
+   "检查更新": "Check for updates",
+   "检查问题、启动与快速修复": "Check issues, launch and quick fixes",
+@@ -684,7 +662,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "正在修复…": "Repairing…",
+   "正在修复历史会话": "Repairing historical sessions",
+   "正在准备安装包下载…": "Preparing installer download…",
+-  "正在启动安装包…": "Launching installer…",
+   "下载或启动耗时较长，请保持窗口打开；完成或失败后会自动更新状态。": "The download or launch is taking longer than usual. Keep this window open; the status will update when it finishes or fails.",
+   "正在写入 Codex 配置…": "Writing Codex config…",
+   "正在写入修复与备份…": "Writing repairs and backups…",
+@@ -702,8 +679,6 @@ export const EN_PLAIN: Record<string, string> = {
+     "This provider keeps official login mode and mixes the current API Key into requests; Codex enhancements stay in compatible mode.",
+   "此供应商会切回官方登录模式，使用 ChatGPT 官方账号，不写入 API Key。":
+     "This provider switches back to official login mode using the official ChatGPT account, without writing an API Key.",
+-  "此供应商会同时写入 config.toml 和 auth.json；API Key 也会注入到 provider bearer token。":
+-    "This provider writes both config.toml and auth.json; the API Key is also injected into the provider bearer token.",
+   "每次请求按成员顺序切换，适合均匀摊请求量。": "Switches members in order on each request, good for evenly spreading request volume.",
+   "每行一个参数，例如 --force_high_performance_gpu。不需要填写 open 或 --args。":
+     "One argument per line, e.g. --force_high_performance_gpu. No need to include open or --args.",
+@@ -750,7 +725,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "禁用此扩展项": "Disable this entry",
+   "移除 watcher": "Remove watcher",
+   "移除最近记录": "Remove from recent",
+-  "立刻修复历史会话": "Repair historical sessions now",
+   "第三方": "Third party",
+   "策略": "Strategy",
+   "管理 API 供应商、协议、Key 与配置文件": "Manage API providers, protocols, keys and config files",
+@@ -765,8 +739,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "纯文本模型请配置此项": "Configure this for text-only models",
+   "纯 API 就绪：会同时写入 config.toml 和 auth.json。": "Pure API ready: writes both config.toml and auth.json.",
+   "纯 API 模式": "Pure API mode",
+-  "纯 API 配置未完整写入：请检查此供应商是否有 OPENAI_API_KEY，且 config.toml 是否包含 model_provider / provider / base_url。":
+-    "Pure API config is incomplete: check whether this provider has OPENAI_API_KEY and whether config.toml includes model_provider / provider / base_url.",
+   "官方登录未混入 API 时不写入会话 provider": "Official login without mixed API does not write a session provider",
+   "Custom（默认）": "Custom (default)",
+   "OpenAI（兼容 ChatGPT Remote）": "OpenAI (ChatGPT Remote compatible)",
+@@ -800,8 +772,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "覆盖图片": "Overlay image",
+   "背景适配方式": "Background fit mode",
+   "原样发送图片": "Send images as-is",
+-  "为纯文本模型移除消息中的图片": "Remove images from messages for text-only models",
+-  "为纯文本模型配置图片分析路由": "Configure image analysis routing for text-only models",
+   "若开启 VLM analysis，请确认 VLM 配置项完整且服务可用。": "If VLM analysis is enabled, make sure the VLM settings are complete and the service is available.",
+   "仅在 Chat Completion 和聚合模式生效。": "Only effective in Chat Completion and aggregate mode.",
+   "VLM 配置不完整：API Key、Model 和 Base URL 为必填项，否则 VLM 不会生效。":
+@@ -820,7 +790,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "诊断已生成": "Diagnostics generated",
+   "诊断报告": "Diagnostic report",
+   "诊断报告已复制。": "Diagnostic report copied.",
+-  "点击后会打开诊断弹框，按步骤检查供应商。": "Click to open the diagnostic dialog and check the provider step by step.",
+   "正在诊断供应商，请稍候。": "Diagnosing provider, please wait.",
+   "诊断已完成。": "Diagnosis complete.",
+   "诊断中": "Diagnosing",
+@@ -843,8 +812,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "读取 ~/.cc-switch/cc-switch.db": "Reading ~/.cc-switch/cc-switch.db",
+   "调用失败": "Call failed",
+   "资源": "Asset",
+-  "赞助商推荐": "Sponsor recommendations",
+-  "赞助商推荐与普通推荐": "Sponsor and regular recommendations",
+   "输入中转服务的 API Key": "Enter the relay service API Key",
+   "运行中": "Running",
+   "返回列表": "Back to list",
+@@ -920,8 +887,6 @@ export const EN_PLAIN: Record<string, string> = {
+   "重新检测": "Check again",
+   "排查可能干扰中转站配置的本机环境": "Find local environment settings that may interfere with relay configuration",
+   "单模型路由": "Per-model routing",
+-  "首次启用单模型路由需要启动本地协议代理。保存后将立即重启 Codex，使路由安全生效。是否继续？":
+-    "Enabling per-model routing for the first time requires the local protocol proxy. Codex will restart immediately after saving so routing can take effect safely. Continue?",
+   "匹配模型": "Match model",
+   "目标供应商": "Target provider",
+   "目标模型（可选）": "Target model (optional)",
+@@ -1046,6 +1011,73 @@ export const EN_PLAIN: Record<string, string> = {
+   "高级：直接编辑 TOML": "Advanced: edit TOML directly",
+   "此条目还有表单未覆盖的高级配置，保存时会原样保留。展开下方高级区可查看。":
+     "This entry has advanced settings the form does not cover. They are preserved on save — expand the advanced section below to view them.",
++  "导入 Codex 会话": "导入 Codex 会话",
++  "会话文件": "会话文件",
++  "会话导入": "会话导入",
++  "请粘贴 Codex++ 分享链接。": "请粘贴 Codex++ 分享链接。",
++  "DreamSkin 社区": "DreamSkin 社区",
++  "导入 DreamSkin 主题包": "导入 DreamSkin 主题包",
++  "导入主题包": "导入主题包",
++  "DreamSkin 社区主题": "DreamSkin 社区主题",
++  "从 DreamSkin.cc 加载已审核主题包。": "从 DreamSkin.cc 加载已审核主题包。",
++  "刷新社区": "刷新社区",
++  "在线主题库": "在线主题库",
++  "在线 Studio": "在线 Studio",
++  "搜索社区主题": "搜索社区主题",
++  "搜索主题名称、作者或许可证": "搜索主题名称、作者或许可证",
++  "最新审核": "最新审核",
++  "下载最多": "下载最多",
++  "名称排序": "名称排序",
++  "社区主题排序": "社区主题排序",
++  "正在加载 DreamSkin 社区…": "正在加载 DreamSkin 社区…",
++  "没有匹配的社区主题。": "没有匹配的社区主题。",
++  "DreamSkin 社区暂时没有可用主题。": "DreamSkin 社区暂时没有可用主题。",
++  "下载、校验并安装主题包": "下载、校验并安装主题包",
++  "此主题仅支持在线预览或下载": "此主题仅支持在线预览或下载",
++  "预览": "预览",
++  "搜索市场脚本": "搜索市场脚本",
++  "搜索名称、作者、描述或标签": "搜索名称、作者、描述或标签",
++  "脚本市场排版": "脚本市场排版",
++  "板块": "板块",
++  "列表": "列表",
++  "没有匹配的市场脚本。": "没有匹配的市场脚本。",
++  "导入文件": "导入文件",
++  "会话分享链接": "会话分享链接",
++  "粘贴 Codex++ 会话分享链接": "粘贴 Codex++ 会话分享链接",
++  "导入链接": "导入链接",
++  "多模态模型直接接收图片,不经过任何处理": "多模态模型直接接收图片,不经过任何处理",
++  "移除图片": "移除图片",
++  "删掉图片只发文字,避免纯文本模型报错(模型看不到图)": "删掉图片只发文字,避免纯文本模型报错(模型看不到图)",
++  "视觉辅助分析": "视觉辅助分析",
++  "图片先由视觉辅助模型(Qwen)转成文字描述,纯文本模型也能\"看图\"": "图片先由视觉辅助模型(Qwen)转成文字描述,纯文本模型也能\"看图\"",
++  "尝试从sub2api获取倍率显示": "尝试从sub2api获取倍率显示",
++  "保存前可先尝试从 /v1/sub2api/billing 获取上游倍率。": "保存前可先尝试从 /v1/sub2api/billing 获取上游倍率。",
++  "非 Sub2API 供应商不会请求或显示倍率。": "非 Sub2API 供应商不会请求或显示倍率。",
++  "获取倍率": "获取倍率",
++  "当前使用中：保留此供应商的 auth 存档，避免 Codex 登录密钥覆盖供应商密钥": "当前使用中：保留此供应商的 auth 存档，避免 Codex 登录密钥覆盖供应商密钥",
++  "安全提示：网页链接中的自定义 config.toml 和 auth.json 不会执行；管理工具只会使用上方字段生成受管配置。": "安全提示：网页链接中的自定义 config.toml 和 auth.json 不会执行；管理工具只会使用上方字段生成受管配置。",
++  "从 DreamSkin.cc 安装主题": "从 DreamSkin.cc 安装主题",
++  "检测到网页一键换肤请求。确认后会从固定社区 API 下载，并在本机重新校验大小、SHA-256、ZIP 清单与 Safe CSS。": "检测到网页一键换肤请求。确认后会从固定社区 API 下载，并在本机重新校验大小、SHA-256、ZIP 清单与 Safe CSS。",
++  "主题版本 ID": "主题版本 ID",
++  "链接不能携带任意下载地址、文件路径或命令；安装后主题会进入“我的主题”，不会自动重启 Codex。": "链接不能携带任意下载地址、文件路径或命令；安装后主题会进入“我的主题”，不会自动重启 Codex。",
++  "下载并安装": "下载并安装",
++  "Sub2API 倍率未获取": "Sub2API 倍率未获取",
++  "选择 cc-switch 数据库": "Choose the cc-switch database",
++  "cc-switch 数据库": "cc-switch database",
++  "恢复默认数据库": "Restore default database",
++  "此配置需要启动本地协议代理。保存后将立即重启 Codex，使配置生效。是否继续？":
++    "This configuration requires the local protocol proxy. Codex will restart immediately after saving. Continue?",
++  "无需认证": "No authentication",
++  "仅用于可信的本地或内网上游。请勿将无认证服务暴露到公网，任何能访问该地址的人都可调用模型。":
++    "Only use this with a trusted local or internal upstream. Do not expose an unauthenticated service to the public internet; anyone who can reach it can call the models.",
++  "无需认证时不发送 Authorization": "No Authorization header is sent when authentication is disabled",
++  "此供应商会同时写入 config.toml 和 auth.json；API Key 保存在 auth.json 中。": "This provider writes both config.toml and auth.json; the API Key is stored in auth.json.",
++  "此供应商会通过本地协议代理连接上游，Codex 侧保持认证模式，但不会向上游发送 Authorization。":
++    "This provider connects to the upstream through the local protocol proxy. Codex stays in authenticated mode, but Authorization is not sent upstream.",
++  "当前供应商还没有完整 config.toml / auth.json 存档。": "The current provider does not have complete config.toml / auth.json archives yet.",
++  "纯 API 配置未完整写入：请检查 config.toml 是否包含 model_provider / provider / base_url，以及认证设置是否匹配上游。":
++    "Pure API config is incomplete: check that config.toml contains model_provider / provider / base_url and that the authentication settings match the upstream.",
++  "纯 API 就绪：上游请求不发送 Authorization。": "Pure API ready: upstream requests do not send Authorization.",
+ };
+
+ // Interpolated strings: tf("前缀 {0}", [x]) -> EN_TEMPLATE["前缀 {0}"] with {0} filled.
+@@ -1054,6 +1086,9 @@ export const EN_TEMPLATE: Record<string, string> = {
+   "删除 Grok 模型「{0}」？": "Delete Grok model \"{0}\"?",
+   "模型「{0}」的上下文窗口必须是大于 0 的整数。": "The context window for model \"{0}\" must be a positive integer.",
+   "作者：{0} · {1}": "Author: {0} · {1}",
++  "来自 DreamSkin.cc 的已审核主题，共 {0} 套；安装前仍会在本机再次校验。": "{0} reviewed themes from DreamSkin.cc; each package is verified locally before installation.",
++  "作者：{0} · {1} · {2} 次下载": "Author: {0} · {1} · {2} download(s)",
++  "主题包：{0}": "Theme package: {0}",
+   "清单更新于 {0}，安装后会保存到“我的主题”。": "Manifest updated {0}. Installed themes are saved under My themes.",
+   "，补齐 {0} 条侧边栏索引": ", added {0} missing sidebar index entry/entries",
+   "，清理 {0} 条误列的子任务侧边栏索引":
+@@ -1069,7 +1104,6 @@ export const EN_TEMPLATE: Record<string, string> = {
+   "{0} 个市场脚本，已安装 {1} 个，本地整体 {2}": "{0} marketplace script(s), {1} installed, local overall {2}",
+   "{0} 个项目": "{0} project(s)",
+   "{0} 副本": "{0} copy",
+-  "{0} 条": "{0} item(s)",
+   "供应商 {0}": "Provider {0}",
+   "供应商「{0}」缺少独立 config.toml，已停止切换，避免继续显示上一套配置文件。请先在该供应商详情里保存 config.toml。":
+     "Provider “{0}” is missing its own config.toml, so the switch was stopped to avoid showing the previous config files. Save config.toml in this provider's details first.",
+@@ -1078,7 +1112,8 @@ export const EN_TEMPLATE: Record<string, string> = {
+   "模型「{0}」的目标供应商不存在。": "The target provider for model “{0}” does not exist.",
+   "模型「{0}」不能路由到聚合供应商。": "Model “{0}” cannot route to an aggregate provider.",
+   "模型「{0}」的目标供应商必须使用 Responses API。": "The target provider for model “{0}” must use the Responses API.",
+-  "模型「{0}」的目标供应商缺少 Base URL 或 Key。": "The target provider for model “{0}” is missing a Base URL or key.",
++  "模型「{0}」的目标供应商缺少 Base URL，或没有 Key 且未开启无需认证。":
++    "The target provider for model “{0}” is missing a Base URL, or has no key and does not have authentication disabled.",
+   "删除会话“{0}”？此操作会删除本地数据库记录和 rollout 文件，并创建备份。":
+     "Delete session “{0}”? This deletes the local database record and rollout file, and creates a backup.",
+   "删除主题“{0}”？此操作无法撤销。": "Delete theme “{0}”? This action cannot be undone.",
+@@ -1100,7 +1135,6 @@ export const EN_TEMPLATE: Record<string, string> = {
+   "官方账号已登录：{0}。": "Official account logged in: {0}.",
+   "已删除 {0} 个会话。": "Deleted {0} session(s).",
+   "已删除 {0} 个，失败 {1} 个：{2}": "Deleted {0}, failed {1}: {2}",
+-  "已加载 {0} 条推荐": "Loaded {0} recommendation(s)",
+   "已同步到 {0}：修复 {1} 个会话文件，更新 {2} 行数据库索引{3}{4}{5}{6}。":
+     "Synced to {0}: repaired {1} session file(s) and updated {2} database index row(s){3}{4}{5}{6}.",
+   "已安装 {0}": "Installed {0}",
+@@ -1118,7 +1152,9 @@ export const EN_TEMPLATE: Record<string, string> = {
+   "发现 {0} 条仅存在于 session_index.jsonl、未在本地数据库或 rollout 中找到来源的候选记录。它们也可能是云端或尚未落盘的任务，请逐项核对。任务标题仅用于预览，实际按 thread ID 与数据来源判断。清理前请先完全退出 Codex App / ChatGPT。":
+     "Found {0} candidate record(s) that exist only in session_index.jsonl and have no source in the local databases or rollout files. They may still represent cloud-only or not-yet-persisted tasks, so review each item. Titles are shown only for preview; cleanup is decided by thread ID and data sources. Fully exit Codex App / ChatGPT before cleanup.",
+   "确认清理 {0} 条": "Confirm cleanup of {0}",
+-  "清单更新时间：{0}": "Manifest updated at: {0}",
++  "清单更新时间：{0}，当前显示 {1} / {2}": "Manifest updated at: {0}; showing {1} / {2}",
++  "当前缓存倍率：{0}x": "Current cached multiplier: {0}x",
++  "Sub2API 倍率 {0}x": "Sub2API multiplier {0}x",
+   "留空使用默认：{0}": "Leave empty to use the default: {0}",
+   "聚合供应商 {0}": "Aggregate provider {0}",
+   "聚合供应商已配置为{0}，包含 {1} 个成员；真实对话会走本地代理轮转。":
+diff --git a/assets/inject/renderer-inject.js b/assets/inject/renderer-inject.js
+index 9a2ac85..1b12388 100644
+--- a/assets/inject/renderer-inject.js
++++ b/assets/inject/renderer-inject.js
+@@ -1198,20 +1198,6 @@
+       .codex-plus-user-script-error { margin-top: 2px; color: #f87171; font-size: 11px; word-break: break-all; }
+       .codex-plus-user-script-actions { display: grid; justify-items: end; gap: 8px; min-width: 120px; }
+       .codex-plus-user-script-reload { border: 1px solid rgba(255,255,255,.18); border-radius: 7px; background: #3f3f46; color: #f3f4f6; font: 12px system-ui, sans-serif; padding: 6px 8px; }
+-      .codex-plus-sponsor-text { color: #d1d5db; font-size: 13px; line-height: 1.55; margin: 4px 0 12px; }
+-      .codex-plus-ad-section { display: grid; gap: 10px; margin-top: 12px; }
+-      .codex-plus-ad-section:first-of-type { margin-top: 0; }
+-      .codex-plus-ad-section-title { color: #f8fafc; font-size: 15px; margin: 0; }
+-      .codex-plus-ad-list { display: grid; gap: 14px; }
+-      .codex-plus-ad-card { border: 1px solid rgba(96,165,250,.26); border-radius: 16px; background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(255,255,255,.05)); box-shadow: 0 14px 36px rgba(0,0,0,.22); }
+-      .codex-plus-ad-image { display: block; width: calc(100% - 28px); aspect-ratio: 16 / 5; margin: 14px 14px 0; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: #080808; object-fit: cover; }
+-      .codex-plus-ad-content { padding: 14px; }
+-      .codex-plus-ad-title { margin: 0; overflow: hidden; color: #f8fafc; font-size: 17px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+-      .codex-plus-ad-description { display: -webkit-box; margin: 6px 0 10px; overflow: hidden; color: #dbeafe; font-size: 13px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-height: 1.55; }
+-      .codex-plus-ad-highlights { display: flex; flex-wrap: wrap; gap: 6px; max-height: 56px; margin-bottom: 12px; overflow: hidden; }
+-      .codex-plus-ad-highlights span { border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(255,255,255,.08); color: #f3f4f6; font-size: 12px; padding: 4px 8px; }
+-      .codex-plus-ad-link { display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #2563eb; color: #ffffff; font-size: 13px; font-weight: 650; text-decoration: none; padding: 8px 12px; }
+-      .codex-plus-ad-empty { border: 1px dashed rgba(255,255,255,.16); border-radius: 12px; color: #9ca3af; font-size: 13px; padding: 12px; text-align: center; }
+       /* Keep injected surfaces on Codex's own semantic palette in both themes. */
+       :root, :where(.${moreMenuClass}, .${actionTooltipClass}, .${zedRemoteToastClass}, .codex-delete-toast, .codex-delete-confirm-overlay, .codex-plus-modal-overlay, .${codexPlusPageClass}) {
+         --codex-plus-bg-primary: var(--color-token-bg-primary, var(--token-bg-primary, #fff));
+@@ -1288,8 +1274,7 @@
+       .codex-plus-backend-label,
+       .codex-plus-form-message,
+       .codex-plus-user-script-dirs,
+-      .codex-plus-user-script-meta,
+-      .codex-plus-sponsor-text { color: var(--codex-plus-text-secondary); }
++      .codex-plus-user-script-meta { color: var(--codex-plus-text-secondary); }
+       .codex-delete-confirm-actions button,
+       .codex-plus-action-button,
+       .codex-plus-issue-button,
+@@ -1378,15 +1363,6 @@
+       .${codexServiceTierBadgeClass}[data-tier="fast"] { border-color: var(--color-border-primary, var(--codex-plus-focus)); background: var(--color-background-primary-soft, var(--codex-plus-bg-selected)); color: var(--codex-plus-text); }
+       .${codexServiceTierBadgeClass}[data-tier="failed"] { border-color: var(--color-border-danger, var(--codex-plus-danger)); background: var(--codex-plus-danger-bg); color: var(--codex-plus-danger); }
+       .${codexServiceTierBadgeClass}[data-tier="unsupported"] { border-color: var(--color-border-warning, var(--codex-plus-border)); background: var(--color-background-warning-soft, var(--codex-plus-bg-hover)); color: var(--codex-plus-warning); }
+-      .codex-plus-ad-card { border-color: var(--codex-plus-border); border-radius: var(--border-radius-lg, 8px); background: var(--codex-plus-bg-secondary); box-shadow: none; }
+-      .codex-plus-ad-image { border-color: var(--codex-plus-border); border-radius: var(--border-radius-lg, 8px); background: var(--codex-plus-bg-primary); }
+-      .codex-plus-ad-title,
+-      .codex-plus-ad-section-title { color: var(--codex-plus-text); }
+-      .codex-plus-ad-description { color: var(--codex-plus-text-secondary); }
+-      .codex-plus-ad-highlights span { border-color: var(--codex-plus-border); border-radius: var(--border-radius-sm, 6px); background: var(--codex-plus-bg-hover); color: var(--codex-plus-text-secondary); }
+-      .codex-plus-ad-link { border-radius: var(--border-radius-lg, 8px); background: var(--color-background-primary-solid, #10a37f); color: var(--color-text-on-accent, #fff); }
+-      .codex-plus-ad-link:hover { background: var(--color-background-primary-solid-hover, var(--color-background-primary-solid, #10a37f)); }
+-      .codex-plus-ad-empty { border-color: var(--codex-plus-border); border-radius: var(--border-radius-lg, 8px); color: var(--codex-plus-text-tertiary); }
+       .codex-plus-form-message[data-status="ok"], .codex-plus-service-tier-status[data-status="ok"], .codex-plus-backend-label[data-status="ok"] { color: var(--codex-plus-success); }
+       .codex-plus-form-message[data-status="failed"], .codex-plus-service-tier-status[data-status="failed"], .codex-plus-backend-label[data-status="failed"], .codex-plus-user-script-error { color: var(--codex-plus-danger); }
+       .codex-plus-form-message[data-status="loading"], .codex-plus-service-tier-status[data-status="unsupported"], .codex-plus-user-script-warning, .codex-plus-model-compat-warning { color: var(--codex-plus-warning); }
+@@ -2400,11 +2376,7 @@
+   const codexServiceTierSupportedFastModels = new Set(["gpt-5.4", "gpt-5.5"]);
+   const codexThreadServiceTierModes = new Set(["inherit", "standard", "fast"]);
+   const codexServiceTierControlModes = new Set(["inherit", "global-standard", "global-fast", "custom"]);
+-  // 这里只放确认支持 priority service tier 的官方模型——这个集合同时用于生成
+-  // 「Fast 仅支持 …」的提示文案，塞进没验证过的模型等于对用户做出错误承诺。
+-  // 第三方模型（deepseek 等）走下面 codexServiceTierFastSupportedForModel 里的
+-  // 模型元数据判定：上游自己声明了 priority 才认。
+-  ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].forEach((model) => codexServiceTierSupportedFastModels.add(model));
++  ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v3", "gpt-5.4", "gpt-5.5"].forEach((model) => codexServiceTierSupportedFastModels.add(model));
+
+   function uniqueCodexAppAssetUrls(urls) {
+     return Array.from(new Set((urls || []).filter((url) => typeof url === "string" && url.includes("/assets/") && url.split("?")[0].endsWith(".js"))));
+@@ -2690,8 +2662,7 @@
+     const normalized = normalizeCodexServiceTierModelName(modelName);
+     if (!normalized) return false;
+     if (codexServiceTierSupportedFastModels.has(normalized)) return true;
+-    // 不按名字猜：模型叫 deepseek 不代表它的中转站支持 priority tier。
+-    // 只认上游模型元数据里明确声明的 priority。
++    if (normalized.includes("deepseek") || normalized.includes("1m")) return true;
+     try {
+       const metadata = typeof codexPlusModelMetadata === "function" ? codexPlusModelMetadata(modelName) : null;
+       if (metadata && Array.isArray(metadata.serviceTiers) && metadata.serviceTiers.some((t) => String(t.id || t).toLowerCase() === "priority")) return true;
+@@ -3970,114 +3941,6 @@
+     }
+   }
+
+-  const codexPlusAdsUrl = "/ads";
+-  let codexPlusAds = [];
+-  let codexPlusAdsLoaded = false;
+-
+-  function isCodexPlusAdExpired(ad) {
+-    if (!ad.expires_at) return false;
+-    const expiresAt = Date.parse(ad.expires_at);
+-    return Number.isFinite(expiresAt) && expiresAt < Date.now();
+-  }
+-
+-  function normalizeCodexPlusAds(payload) {
+-    if (!payload || !Array.isArray(payload.ads)) return [];
+-    return payload.ads.filter((ad) => {
+-      return ad && ["sponsor", "normal"].includes(ad.type) && ad.title && ad.description && ad.url && !isCodexPlusAdExpired(ad);
+-    }).map((ad) => ({
+-      id: String(ad.id || ad.title),
+-      type: ad.type,
+-      title: String(ad.title),
+-      description: String(ad.description),
+-      url: String(ad.url),
+-      image: ad.image ? String(ad.image) : "",
+-      expires_at: ad.expires_at ? String(ad.expires_at) : "",
+-      highlights: Array.isArray(ad.highlights) ? ad.highlights.map((item) => String(item)).filter(Boolean) : [],
+-    }));
+-  }
+-
+-  function formatCodexPlusAdTitle(title) {
+-    const value = String(title || "");
+-    return value.split(/[｜|]/, 1)[0].trim() || value;
+-  }
+-
+-  function renderCodexPlusAdGroup(type, emptyText) {
+-    const ads = codexPlusAds.filter((ad) => ad.type === type);
+-    if (!ads.length) return `<div class="codex-plus-ad-empty">${escapeHtml(emptyText)}</div>`;
+-    return ads.map((ad) => `
+-      <article class="codex-plus-ad-card">
+-        ${ad.image ? `<img class="codex-plus-ad-image" src="${escapeHtml(ad.image)}" alt="">` : ""}
+-        <div class="codex-plus-ad-content">
+-          <h3 class="codex-plus-ad-title">${escapeHtml(formatCodexPlusAdTitle(ad.title))}</h3>
+-          <p class="codex-plus-ad-description">${escapeHtml(ad.description)}</p>
+-          <div class="codex-plus-ad-highlights">
+-            ${ad.highlights.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+-          </div>
+-          <a class="codex-plus-ad-link" href="${escapeHtml(ad.url)}" target="_blank" rel="noreferrer">访问 ${escapeHtml(new URL(ad.url).hostname)}</a>
+-        </div>
+-      </article>
+-    `).join("");
+-  }
+-
+-  function renderCodexPlusAds() {
+-    if (!codexPlusAdsLoaded) return `<div class="codex-plus-ad-empty">推荐内容加载中…</div>`;
+-    if (!codexPlusAds.length) return `<div class="codex-plus-ad-empty">暂无推荐内容。</div>`;
+-    return `
+-      <section class="codex-plus-ad-section">
+-        <h3 class="codex-plus-ad-section-title">赞助商推荐</h3>
+-        <div class="codex-plus-ad-list">${renderCodexPlusAdGroup("sponsor", "暂无赞助商推荐。")}</div>
+-      </section>
+-      <section class="codex-plus-ad-section">
+-        <h3 class="codex-plus-ad-section-title">普通推荐</h3>
+-        <div class="codex-plus-ad-list">${renderCodexPlusAdGroup("normal", "暂无普通推荐。")}</div>
+-      </section>
+-    `;
+-  }
+-
+-  function cacheBustCodexPlusAdUrl(url, version) {
+-    return `${url}${url.includes("?") ? "&" : "?"}v=${version}`;
+-  }
+-
+-  async function directFetchCodexPlusAds() {
+-    const urls = [
+-      "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json",
+-      "https://cdn.jsdelivr.net/gh/BigPizzaV3/Ad-List@main/ads.json",
+-    ];
+-    let lastError = null;
+-    const cacheBust = Date.now();
+-    for (const url of urls) {
+-      try {
+-        const response = await fetch(cacheBustCodexPlusAdUrl(url, cacheBust), {
+-          headers: { "Accept": "application/json" },
+-          cache: "no-store",
+-        });
+-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+-        return await response.json();
+-      } catch (error) {
+-        lastError = error;
+-      }
+-    }
+-    throw lastError || new Error("ad list unavailable");
+-  }
+-
+-  async function fetchCodexPlusAds() {
+-    try {
+-      const localPayload = await postJson(codexPlusAdsUrl, {});
+-      codexPlusAds = normalizeCodexPlusAds(localPayload?.ads ? localPayload : localPayload?.payload);
+-      if (!codexPlusAds.length) codexPlusAds = normalizeCodexPlusAds(await directFetchCodexPlusAds());
+-    } catch (error) {
+-      sendCodexPlusDiagnostic("ads_fetch_failed", {
+-        errorName: error?.name || "",
+-        errorMessage: error?.message || String(error),
+-      });
+-      codexPlusAds = [];
+-    } finally {
+-      codexPlusAdsLoaded = true;
+-      const panel = document.querySelector('[data-codex-plus-panel="sponsor"] .codex-plus-ad-remote');
+-      if (panel) panel.innerHTML = renderCodexPlusAds();
+-    }
+-  }
+-
+   function selectCodexPlusTab(tab) {
+     document.querySelectorAll(".codex-plus-modal-content").forEach((modal) => {
+       modal.dataset.codexPlusActiveTab = tab;
+@@ -4189,7 +4052,6 @@
+         <div class="codex-plus-tabs" role="tablist" aria-label="Codex++">
+           <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="home" data-active="true">主页</button>
+           <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="userScripts" data-active="false">用户脚本</button>
+-          <button type="button" class="codex-plus-tab-button" data-codex-plus-tab="sponsor" data-active="false">推荐内容</button>
+         </div>
+         <div class="codex-plus-modal-body">
+           <div class="codex-plus-panel" data-codex-plus-panel="home">
+@@ -4322,12 +4184,6 @@
+               </div>
+             </div>
+           </div>
+-          <div class="codex-plus-panel" data-codex-plus-panel="sponsor" hidden>
+-            <div class="codex-plus-sponsor-text">推荐内容分为赞助商推荐和普通推荐。赞助商推荐来自支持 Codex++ 继续维护的合作方；普通推荐用于展示适合 Codex 用户的服务与信息。</div>
+-            <div class="codex-plus-ad-remote">
+-              ${renderCodexPlusAds()}
+-            </div>
+-          </div>
+         </div>
+       </div>
+     `;
+@@ -4458,7 +4314,6 @@
+         window.addEventListener("resize", window.__codexPlusPageResizeHandler);
+       }
+     }
+-    if (!codexPlusAdsLoaded) fetchCodexPlusAds();
+     selectCodexPlusTab("home");
+     renderCodexPlusMenu();
+     refreshCodexPlusBackendToggles();
+@@ -4611,10 +4466,7 @@
+     if (name === "openai-curated") return "OpenAI插件2(Codex++)";
+     if (name === "openai-primary-runtime") return "OpenAI插件3(Codex++)";
+     if (name === "openai-api-curated") return "OpenAI插件4(Codex++)";
+-    // 内置插件包的注册名。曾经叫 openai-curated-remote，但那是 codex 的保留名，
+-    // 注册在它下面会被静默忽略，已改为 codex-plus-curated；旧名保留以兼容
+-    // 尚未升级的配置。
+-    if (name === "codex-plus-curated" || name === "openai-curated-remote") return "OpenAI插件5(Codex++)";
++    if (name === "openai-curated-remote") return "OpenAI插件5(Codex++)";
+     return fallback;
+   }
+
+@@ -10402,41 +10254,10 @@
+     window.__codexSessionDeleteScanTimer = setTimeout(runScheduledScan, 200);
+   }
+
+-  /**
+-   * 侧边栏入口的启动补扫。
+-   *
+-   * 注入永远早于 Codex 把左侧面板渲染出来：注入那一刻 readyState 已是 complete，
+-   * 但 aside.app-shell-left-panel 还不存在（实测 anyNav: 0），所以首次 scan 里的
+-   * installCodexPlusSidebarNavigation 必然走 `if (!navigation) return`。
+-   *
+-   * 之后全靠 MutationObserver 观察到侧边栏挂载再补一次，实测要 2.6~3.1 秒。
+-   * 但那把入口的出现押在了单次 DOM 变更上——那次变更若被 shouldScheduleScan
+-   * 过滤掉，就没有下一次触发，入口会一直缺失到用户手动操作产生新的变更为止。
+-   *
+-   * 这里加一个不依赖 DOM 事件的有界重试作为兜底：插上就停，超时就放弃，
+-   * 不留常驻定时器，也不影响 observer 那条正常路径。
+-   */
+-  function scheduleSidebarNavStartupRetry() {
+-    clearInterval(window.__codexPlusSidebarNavRetryTimer);
+-    let attempts = 0;
+-    window.__codexPlusSidebarNavRetryTimer = setInterval(() => {
+-      attempts += 1;
+-      if (document.getElementById(codexPlusSidebarNavId) || attempts > 20) {
+-        clearInterval(window.__codexPlusSidebarNavRetryTimer);
+-        window.__codexPlusSidebarNavRetryTimer = null;
+-        return;
+-      }
+-      try {
+-        installCodexPlusSidebarNavigation();
+-      } catch {}
+-    }, 300);
+-  }
+-
+   void loadBackendSettingsForStartup();
+   installUpstreamBranchDropdownAdapter();
+   installUpstreamWorktreeNativeAdapter();
+   scan();
+-  scheduleSidebarNavStartupRetry();
+   window.removeEventListener("resize", window.__codexPlusResizeHandler);
+   let codexPlusResizeRafId = 0;
+   window.__codexPlusResizeHandler = () => {
+diff --git a/crates/codex-plus-core/src/ads.rs b/crates/codex-plus-core/src/ads.rs
+index ecd6ba2..479faa7 100644
+--- a/crates/codex-plus-core/src/ads.rs
++++ b/crates/codex-plus-core/src/ads.rs
+@@ -1,32 +1,11 @@
+-use serde_json::{Map, Value, json};
++use serde_json::{Value, json};
+ use std::time::{SystemTime, UNIX_EPOCH};
+
+-const VOLCENGINE_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-volcengine.png");
+-const PACKYCODE_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-packycode.png");
+-const TOKEN_BRIDGE_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-0029.svg");
+-const APIKEY_FUN_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-apikey-fun.png");
+-const RAWCHAT_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-rawchat.svg");
+-const RUNAPI_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-runapi.png");
+-const BAIKEWEI_AI_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-baikewei-ai.jpg");
+-const CUBENCE_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-cubence.png");
+-const DEEPKEY_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-deepkey.png");
+-const ERGOU_API_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-ergou-api.png");
+-const APIMART_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-apimart.png");
+-const FENNO_AI_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-fenno-ai.png");
+-const QINIU_AI_IMAGE: &[u8] = include_bytes!("../../../docs/images/sponsor-qiniu-ai.png");
+-const BUILTIN_SPONSOR_EXPIRES_AT: &str = "2026-08-02T23:59:59+08:00";
+-const DEEPKEY_SPONSOR_EXPIRES_AT: &str = "2026-08-25T23:59:59+08:00";
+-const APIMART_SPONSOR_EXPIRES_AT: &str = "2026-09-27T23:59:59+08:00";
+-const NEW_SPONSOR_EXPIRES_AT: &str = "2026-11-27T23:59:59+08:00";
+-
+-pub const DEFAULT_AD_LIST_URLS: [&str; 2] = [
+-    "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json",
+-    "https://cdn.jsdelivr.net/gh/BigPizzaV3/Ad-List@main/ads.json",
+-];
++pub const DEFAULT_AD_LIST_URLS: [&str; 0] = [];
+
+ pub fn normalize_ad_payload(payload: Value) -> Value {
+     let version = payload.get("version").and_then(Value::as_u64).unwrap_or(1);
+-    let mut ads = payload
++    let ads = payload
+         .get("ads")
+         .and_then(Value::as_array)
+         .into_iter()
+@@ -43,193 +22,11 @@ pub fn normalize_ad_payload(payload: Value) -> Value {
+         })
+         .cloned()
+         .collect::<Vec<_>>();
+-    fill_known_remote_logos(&mut ads);
+-    append_builtin_sponsors(&mut ads);
+     json!({ "version": version, "ads": ads })
+ }
+
+-fn fill_known_remote_logos(ads: &mut [Value]) {
+-    for ad in ads {
+-        let Some(object) = ad.as_object_mut() else {
+-            continue;
+-        };
+-        let has_image = object
+-            .get("image")
+-            .and_then(Value::as_str)
+-            .is_some_and(|value| !value.trim().is_empty());
+-        if has_image {
+-            continue;
+-        }
+-        let Some(id) = object.get("id").and_then(Value::as_str) else {
+-            continue;
+-        };
+-        let Some((mime, image)) = known_remote_logo(id) else {
+-            continue;
+-        };
+-        object.insert("image".to_string(), json!(data_uri(mime, image)));
+-    }
+-}
+-
+-fn known_remote_logo(id: &str) -> Option<(&'static str, &'static [u8])> {
+-    match id {
+-        "volcengine-ark-agent-plan" => Some(("image/png", VOLCENGINE_IMAGE)),
+-        "0029-token-bridge" => Some(("image/png", PACKYCODE_IMAGE)),
+-        "0055-token-bridge" => Some(("image/svg+xml", TOKEN_BRIDGE_IMAGE)),
+-        "apikey-fun-ai-relay" => Some(("image/png", APIKEY_FUN_IMAGE)),
+-        "rawchat-codex-relay" => Some(("image/svg+xml", RAWCHAT_IMAGE)),
+-        "runapi-openrouter-alternative" => Some(("image/png", RUNAPI_IMAGE)),
+-        "baikewei-ai" => Some(("image/jpeg", BAIKEWEI_AI_IMAGE)),
+-        "deepkey-api-key" => Some(("image/png", DEEPKEY_IMAGE)),
+-        "apimart" => Some(("image/png", APIMART_IMAGE)),
+-        "fenno-ai" => Some(("image/png", FENNO_AI_IMAGE)),
+-        "qiniu-ai" => Some(("image/png", QINIU_AI_IMAGE)),
+-        _ => None,
+-    }
+-}
+-
+-fn append_builtin_sponsors(ads: &mut Vec<Value>) {
+-    let insert_at = ads
+-        .iter()
+-        .rposition(|ad| ad.get("type").and_then(Value::as_str) == Some("sponsor"))
+-        .map(|index| index + 1)
+-        .unwrap_or(0);
+-    let builtins = [
+-        builtin_sponsor(
+-            "cubence",
+-            "Cubence",
+-            "稳定、高效的 API 中转服务，支持 Claude Code、Codex、Gemini 等模型，适合日常开发和团队使用。",
+-            "https://cubence.com?source=codexplusplus",
+-            CUBENCE_IMAGE,
+-            "image/png",
+-            &["Claude Code", "Codex / Gemini", "稳定接入"],
+-            BUILTIN_SPONSOR_EXPIRES_AT,
+-        ),
+-        builtin_sponsor(
+-            "quya-cloud-bridge",
+-            "quya.org 云桥",
+-            "一站式 AI 中转平台，集成 Claude Code、Codex、Gemini 等模型，提供包月和按量计费方案。",
+-            "https://www.quya.org/?promo=CODEX",
+-            TOKEN_BRIDGE_IMAGE,
+-            "image/svg+xml",
+-            &[
+-                "Claude Code / Codex / Gemini",
+-                "国内直连",
+-                "包月 / 按量计费",
+-            ],
+-            BUILTIN_SPONSOR_EXPIRES_AT,
+-        ),
+-        builtin_sponsor(
+-            "deepkey-api-key",
+-            "deepkey｜API KEY",
+-            "面向开发者与学生群体的 API KEY 服务，提供稳定接口和提示词工程交流社区。",
+-            "https://deepkey.top/register?aff=DNVc",
+-            DEEPKEY_IMAGE,
+-            "image/png",
+-            &["稳定接口", "开发者社区", "提示词交流"],
+-            DEEPKEY_SPONSOR_EXPIRES_AT,
+-        ),
+-        builtin_sponsor(
+-            "ergou-api",
+-            "二狗 API",
+-            "AI API 中转服务，覆盖 Claude、GPT、Gemini 等模型，提供低延迟线路和备用链路。",
+-            "https://ergouapi.com/r/gh-codexplusplus",
+-            ERGOU_API_IMAGE,
+-            "image/png",
+-            &["Claude / GPT / Gemini", "低延迟线路", "备用链路"],
+-            BUILTIN_SPONSOR_EXPIRES_AT,
+-        ),
+-        builtin_sponsor(
+-            "apimart",
+-            "API Mart",
+-            "专注 AI 图片和视频生成的低价 API 平台，一套异步 API 覆盖图片与视频任务，支持大批量生成和按量付费。",
+-            "https://go.apimart.ai/gh-codexplusplus",
+-            APIMART_IMAGE,
+-            "image/png",
+-            &["图片 / 视频", "异步任务 API", "按量付费"],
+-            APIMART_SPONSOR_EXPIRES_AT,
+-        ),
+-        builtin_sponsor(
+-            "fenno-ai",
+-            "FennoAI",
+-            "稳定高效的 Codex API 中转服务，兼容 OpenAI 与 Anthropic 协议，支持企业级调用、公对公结算和开票。",
+-            "https://api.fenno.ai/s/ZZM7",
+-            FENNO_AI_IMAGE,
+-            "image/png",
+-            &["Codex 中转", "企业级调用", "公对公结算"],
+-            NEW_SPONSOR_EXPIRES_AT,
+-        ),
+-        builtin_sponsor(
+-            "qiniu-ai",
+-            "七牛云",
+-            "七牛云旗下企业级大模型 MaaS 平台，一站式调用全球 150 多个主流模型，覆盖文本、图像、音频、视频等全模态能力。",
+-            "https://s.qiniu.com/7zUJri",
+-            QINIU_AI_IMAGE,
+-            "image/png",
+-            &["150+ 主流模型", "全模态能力", "企业免费额度"],
+-            NEW_SPONSOR_EXPIRES_AT,
+-        ),
+-    ];
+-    let mut cursor = insert_at;
+-    for sponsor in builtins {
+-        let id = sponsor.get("id").and_then(Value::as_str);
+-        if id.is_some_and(|id| {
+-            ads.iter()
+-                .any(|ad| ad.get("id").and_then(Value::as_str) == Some(id))
+-        }) {
+-            continue;
+-        }
+-        ads.insert(cursor, sponsor);
+-        cursor += 1;
+-    }
+-}
+-
+-fn builtin_sponsor(
+-    id: &str,
+-    title: &str,
+-    description: &str,
+-    url: &str,
+-    image: &[u8],
+-    image_mime: &str,
+-    highlights: &[&str],
+-    expires_at: &str,
+-) -> Value {
+-    let mut sponsor = Map::new();
+-    sponsor.insert("id".to_string(), json!(id));
+-    sponsor.insert("type".to_string(), json!("sponsor"));
+-    sponsor.insert("title".to_string(), json!(title));
+-    sponsor.insert("description".to_string(), json!(description));
+-    sponsor.insert("url".to_string(), json!(url));
+-    sponsor.insert("expires_at".to_string(), json!(expires_at));
+-    sponsor.insert("image".to_string(), json!(data_uri(image_mime, image)));
+-    sponsor.insert("highlights".to_string(), json!(highlights));
+-    Value::Object(sponsor)
+-}
+-
+-fn data_uri(mime: &str, bytes: &[u8]) -> String {
+-    format!("data:{mime};base64,{}", base64_encode(bytes))
+-}
+-
+-fn base64_encode(bytes: &[u8]) -> String {
+-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+-    let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+-    for chunk in bytes.chunks(3) {
+-        let first = chunk[0];
+-        let second = *chunk.get(1).unwrap_or(&0);
+-        let third = *chunk.get(2).unwrap_or(&0);
+-        encoded.push(TABLE[(first >> 2) as usize] as char);
+-        encoded.push(TABLE[(((first & 0b0000_0011) << 4) | (second >> 4)) as usize] as char);
+-        if chunk.len() > 1 {
+-            encoded.push(TABLE[(((second & 0b0000_1111) << 2) | (third >> 6)) as usize] as char);
+-        } else {
+-            encoded.push('=');
+-        }
+-        if chunk.len() > 2 {
+-            encoded.push(TABLE[(third & 0b0011_1111) as usize] as char);
+-        } else {
+-            encoded.push('=');
+-        }
+-    }
+-    encoded
++fn empty_ad_payload() -> Value {
++    json!({ "version": 1, "ads": [] })
+ }
+
+ pub async fn fetch_ad_list() -> anyhow::Result<Value> {
+@@ -245,6 +42,10 @@ pub async fn fetch_ad_list_from_urls<S>(urls: &[S]) -> anyhow::Result<Value>
+ where
+     S: AsRef<str>,
+ {
++    if urls.is_empty() {
++        return Ok(empty_ad_payload());
++    }
++
+     let client = crate::http_client::proxied_client("CodexPlusPlus")?;
+     let cache_bust = SystemTime::now()
+         .duration_since(UNIX_EPOCH)
+diff --git a/crates/codex-plus-core/tests/ads.rs b/crates/codex-plus-core/tests/ads.rs
+index 62f9671..6df43ca 100644
+--- a/crates/codex-plus-core/tests/ads.rs
++++ b/crates/codex-plus-core/tests/ads.rs
+@@ -8,14 +8,15 @@ use codex_plus_core::ads::{
+ use serde_json::json;
+
+ #[test]
+-fn default_ad_urls_match_legacy_helper_sources() {
+-    assert_eq!(
+-        DEFAULT_AD_LIST_URLS,
+-        [
+-            "https://raw.githubusercontent.com/BigPizzaV3/Ad-List/main/ads.json",
+-            "https://cdn.jsdelivr.net/gh/BigPizzaV3/Ad-List@main/ads.json",
+-        ]
+-    );
++fn default_ad_urls_are_empty_for_ad_free_build() {
++    assert!(DEFAULT_AD_LIST_URLS.is_empty());
++}
++
++#[tokio::test]
++async fn fetch_ad_list_with_no_urls_returns_empty_payload() {
++    let payload = fetch_ad_list_from_urls::<&str>(&[]).await.unwrap();
++
++    assert_eq!(payload, json!({"version": 1, "ads": []}));
+ }
+
+ #[test]
+@@ -35,7 +36,7 @@ fn cache_busted_ad_url_preserves_existing_query() {
+ }
+
+ #[test]
+-fn normalizes_remote_ads_for_plugin_and_manager_rendering() {
++fn normalizes_remote_ads_without_adding_promotions() {
+     let payload = normalize_ad_payload(json!({
+         "version": 1,
+         "ads": [
+@@ -65,24 +66,13 @@ fn normalizes_remote_ads_for_plugin_and_manager_rendering() {
+     }));
+
+     assert_eq!(payload["version"], json!(1));
+-    assert_eq!(payload["ads"].as_array().unwrap().len(), 9);
+-    assert_eq!(payload["ads"][0]["type"], json!("sponsor"));
+-    assert_eq!(payload["ads"][1]["id"], json!("cubence"));
+-    assert_eq!(payload["ads"][1]["type"], json!("sponsor"));
+-    assert_eq!(payload["ads"][2]["id"], json!("quya-cloud-bridge"));
+-    assert_eq!(payload["ads"][2]["type"], json!("sponsor"));
+-    assert_eq!(payload["ads"][3]["id"], json!("deepkey-api-key"));
+-    assert_eq!(payload["ads"][3]["type"], json!("sponsor"));
+-    assert_eq!(payload["ads"][4]["id"], json!("ergou-api"));
+-    assert_eq!(payload["ads"][4]["type"], json!("sponsor"));
+-    assert_eq!(payload["ads"][5]["id"], json!("apimart"));
+-    assert_eq!(payload["ads"][6]["id"], json!("fenno-ai"));
+-    assert_eq!(payload["ads"][7]["id"], json!("qiniu-ai"));
+-    assert_eq!(payload["ads"][8]["type"], json!("normal"));
++    assert_eq!(payload["ads"].as_array().unwrap().len(), 2);
++    assert_eq!(payload["ads"][0]["id"], json!("sponsor"));
++    assert_eq!(payload["ads"][1]["id"], json!("normal"));
+ }
+
+ #[test]
+-fn builtin_sponsors_are_appended_after_remote_sponsors_in_declared_order() {
++fn builtin_sponsors_are_not_appended_for_ad_free_build() {
+     let payload = normalize_ad_payload(json!({
+         "version": 1,
+         "ads": [
+@@ -104,81 +94,13 @@ fn builtin_sponsors_are_appended_after_remote_sponsors_in_declared_order() {
+     }));
+     let ads = payload["ads"].as_array().unwrap();
+
++    assert_eq!(ads.len(), 2);
+     assert_eq!(ads[0]["id"], json!("remote-sponsor"));
+-    assert_eq!(ads[1]["id"], json!("cubence"));
+-    assert_eq!(ads[1]["title"], json!("Cubence"));
+-    assert_eq!(
+-        ads[1]["url"],
+-        json!("https://cubence.com?source=codexplusplus")
+-    );
+-    assert_eq!(ads[1]["expires_at"], json!("2026-08-02T23:59:59+08:00"));
+-    assert!(
+-        ads[1]["image"]
+-            .as_str()
+-            .unwrap()
+-            .starts_with("data:image/png;base64,")
+-    );
+-    assert_eq!(ads[2]["id"], json!("quya-cloud-bridge"));
+-    assert_eq!(ads[2]["title"], json!("quya.org 云桥"));
+-    assert_eq!(ads[2]["url"], json!("https://www.quya.org/?promo=CODEX"));
+-    assert_eq!(ads[2]["expires_at"], json!("2026-08-02T23:59:59+08:00"));
+-    assert!(
+-        ads[2]["image"]
+-            .as_str()
+-            .unwrap()
+-            .starts_with("data:image/svg+xml;base64,")
+-    );
+-    assert_eq!(ads[3]["id"], json!("deepkey-api-key"));
+-    assert_eq!(ads[3]["title"], json!("deepkey｜API KEY"));
+-    assert_eq!(
+-        ads[3]["url"],
+-        json!("https://deepkey.top/register?aff=DNVc")
+-    );
+-    assert_eq!(ads[3]["expires_at"], json!("2026-08-25T23:59:59+08:00"));
+-    assert!(
+-        ads[3]["image"]
+-            .as_str()
+-            .unwrap()
+-            .starts_with("data:image/png;base64,")
+-    );
+-    assert_eq!(ads[4]["id"], json!("ergou-api"));
+-    assert_eq!(ads[4]["title"], json!("二狗 API"));
+-    assert_eq!(
+-        ads[4]["url"],
+-        json!("https://ergouapi.com/r/gh-codexplusplus")
+-    );
+-    assert_eq!(ads[4]["expires_at"], json!("2026-08-02T23:59:59+08:00"));
+-    assert!(
+-        ads[4]["image"]
+-            .as_str()
+-            .unwrap()
+-            .starts_with("data:image/png;base64,")
+-    );
+-    assert_eq!(ads[5]["id"], json!("apimart"));
+-    assert_eq!(
+-        ads[5]["url"],
+-        json!("https://go.apimart.ai/gh-codexplusplus")
+-    );
+-    assert_eq!(ads[5]["expires_at"], json!("2026-09-27T23:59:59+08:00"));
+-    assert_eq!(ads[6]["id"], json!("fenno-ai"));
+-    assert_eq!(ads[6]["url"], json!("https://api.fenno.ai/s/ZZM7"));
+-    assert_eq!(ads[6]["expires_at"], json!("2026-11-27T23:59:59+08:00"));
+-    assert_eq!(ads[7]["id"], json!("qiniu-ai"));
+-    assert_eq!(ads[7]["url"], json!("https://s.qiniu.com/7zUJri"));
+-    assert_eq!(ads[7]["expires_at"], json!("2026-11-27T23:59:59+08:00"));
+-    for ad in &ads[5..=7] {
+-        assert!(
+-            ad["image"]
+-                .as_str()
+-                .unwrap()
+-                .starts_with("data:image/png;base64,")
+-        );
+-    }
+-    assert_eq!(ads[8]["id"], json!("remote-normal"));
++    assert_eq!(ads[1]["id"], json!("remote-normal"));
+ }
+
+ #[test]
+-fn normalizes_known_remote_sponsors_with_local_logos() {
++fn known_remote_sponsors_do_not_gain_bundled_logos() {
+     let payload = normalize_ad_payload(json!({
+         "version": 1,
+         "ads": [
+@@ -189,41 +111,6 @@ fn normalizes_known_remote_sponsors_with_local_logos() {
+                 "description": "远端推荐内容",
+                 "url": "https://example.test/volcengine"
+             },
+-            {
+-                "id": "0029-token-bridge",
+-                "type": "sponsor",
+-                "title": "PackyCode",
+-                "description": "远端推荐内容",
+-                "url": "https://example.test/0029"
+-            },
+-            {
+-                "id": "0055-token-bridge",
+-                "type": "sponsor",
+-                "title": "Token 云桥",
+-                "description": "远端推荐内容",
+-                "url": "https://example.test/0055"
+-            },
+-            {
+-                "id": "apikey-fun-ai-relay",
+-                "type": "sponsor",
+-                "title": "APIKEY.FUN",
+-                "description": "远端推荐内容",
+-                "url": "https://example.test/apikey"
+-            },
+-            {
+-                "id": "rawchat-codex-relay",
+-                "type": "sponsor",
+-                "title": "RawChat",
+-                "description": "远端推荐内容",
+-                "url": "https://example.test/rawchat"
+-            },
+-            {
+-                "id": "runapi-openrouter-alternative",
+-                "type": "sponsor",
+-                "title": "RunAPI",
+-                "description": "远端推荐内容",
+-                "url": "https://example.test/runapi"
+-            },
+             {
+                 "id": "baikewei-ai",
+                 "type": "sponsor",
+@@ -231,13 +118,6 @@ fn normalizes_known_remote_sponsors_with_local_logos() {
+                 "description": "远端推荐内容",
+                 "url": "https://example.test/baikewei"
+             },
+-            {
+-                "id": "deepkey-api-key",
+-                "type": "sponsor",
+-                "title": "deepkey",
+-                "description": "远端推荐内容",
+-                "url": "https://example.test/deepkey"
+-            },
+             {
+                 "id": "jojocode-codex-relay",
+                 "type": "sponsor",
+@@ -250,47 +130,9 @@ fn normalizes_known_remote_sponsors_with_local_logos() {
+     }));
+     let ads = payload["ads"].as_array().unwrap();
+
+-    for id in [
+-        "volcengine-ark-agent-plan",
+-        "0029-token-bridge",
+-        "apikey-fun-ai-relay",
+-        "runapi-openrouter-alternative",
+-        "deepkey-api-key",
+-    ] {
+-        let ad = ads.iter().find(|ad| ad["id"] == json!(id)).unwrap();
+-        assert!(
+-            ad["image"]
+-                .as_str()
+-                .unwrap()
+-                .starts_with("data:image/png;base64,"),
+-            "{id}"
+-        );
+-    }
+-    let baikewei = ads
+-        .iter()
+-        .find(|ad| ad["id"] == json!("baikewei-ai"))
+-        .unwrap();
+-    assert!(
+-        baikewei["image"]
+-            .as_str()
+-            .unwrap()
+-            .starts_with("data:image/jpeg;base64,")
+-    );
+-    for id in ["0055-token-bridge", "rawchat-codex-relay"] {
+-        let ad = ads.iter().find(|ad| ad["id"] == json!(id)).unwrap();
+-        assert!(
+-            ad["image"]
+-                .as_str()
+-                .unwrap()
+-                .starts_with("data:image/svg+xml;base64,"),
+-            "{id}"
+-        );
+-    }
+-    let jojocode = ads
+-        .iter()
+-        .find(|ad| ad["id"] == json!("jojocode-codex-relay"))
+-        .unwrap();
+-    assert_eq!(jojocode["image"], json!("https://example.test/logo.png"));
++    assert!(ads[0].get("image").is_none());
++    assert!(ads[1].get("image").is_none());
++    assert_eq!(ads[2]["image"], json!("https://example.test/logo.png"));
+ }
+
+ #[tokio::test]
+@@ -348,7 +190,5 @@ async fn fetch_ad_list_tries_backup_url_when_primary_fails() {
+     .unwrap();
+     thread.join().unwrap();
+
+-    let ads = payload["ads"].as_array().unwrap();
+-    assert!(ads.iter().any(|ad| ad["id"] == json!("ergou-api")));
+-    assert!(ads.iter().any(|ad| ad["id"] == json!("backup-ad")));
++    assert_eq!(payload["ads"][0]["id"], json!("backup-ad"));
+ }
+diff --git a/crates/codex-plus-core/tests/cdp_bridge.rs b/crates/codex-plus-core/tests/cdp_bridge.rs
+index e18fda6..e72d7e1 100644
+--- a/crates/codex-plus-core/tests/cdp_bridge.rs
++++ b/crates/codex-plus-core/tests/cdp_bridge.rs
+@@ -70,41 +70,6 @@ fn injection_script_prefixes_helper_url_and_metadata() {
+     assert!(script.contains("data-codex-plus-discord"));
+ }
+
+-/// 注入永远早于 Codex 渲染左侧面板：注入时 readyState 已是 complete，但
+-/// aside.app-shell-left-panel 还不存在，所以首次 scan 装不上侧边栏入口，
+-/// 之后要等 MutationObserver 观察到侧边栏挂载（实测 2.6~3.1 秒）。
+-///
+-/// 那条路径把入口的出现押在单次 DOM 变更上，变更被过滤掉就再无触发。
+-/// 这里钉住不依赖 DOM 事件的有界重试兜底。
+-#[test]
+-fn injection_script_retries_sidebar_nav_after_startup() {
+-    let script = assets::injection_script(57321);
+-
+-    assert!(script.contains("scheduleSidebarNavStartupRetry"));
+-    // 必须在首次 scan 之后调用，否则等于重复第一次必然失败的尝试
+-    let scan_at = script.find("\n  scan();").expect("startup scan call");
+-    let retry_at = script
+-        .find("\n  scheduleSidebarNavStartupRetry();")
+-        .expect("startup retry call");
+-    assert!(retry_at > scan_at);
+-    // 有界：插上就停、超时就放弃，不留常驻定时器
+-    assert!(script.contains("clearInterval(window.__codexPlusSidebarNavRetryTimer)"));
+-    assert!(script.contains("attempts > 20"));
+-}
+-
+-/// 内置插件包的注册名从 openai-curated-remote 换成了 codex-plus-curated
+-/// （前者是 codex 保留名，注册后会被静默忽略）。显示名映射要跟着认新名，
+-/// 否则插件市场里会显示原始名而不是友好名。
+-#[test]
+-fn injection_script_maps_the_renamed_bundled_marketplace_display_name() {
+-    let script = assets::injection_script(57321);
+-
+-    assert!(
+-        script.contains(r#"name === "codex-plus-curated" || name === "openai-curated-remote""#)
+-    );
+-    assert!(script.contains("OpenAI插件5(Codex++)"));
+-}
+-
+ #[test]
+ fn injection_script_omits_stepwise_runtime_when_disabled() {
+     let script = assets::injection_script_with_settings(57321, &BackendSettings::default());
+@@ -767,13 +732,12 @@ fn injection_script_marks_diagnostic_build_and_reports_script_loaded() {
+ }
+
+ #[test]
+-fn injection_script_fetches_ads_without_bridge() {
++fn injection_script_does_not_fetch_ads_or_render_recommendations() {
+     let script = assets::injection_script(57321);
+
+-    assert!(script.contains("directFetchCodexPlusAds"));
+-    assert!(script.contains("cacheBustCodexPlusAdUrl"));
+-    assert!(script.contains("Date.now()"));
+-    assert!(script.contains("BigPizzaV3/Ad-List"));
++    assert!(!script.contains("directFetchCodexPlusAds"));
++    assert!(!script.contains("cacheBustCodexPlusAdUrl"));
++    assert!(!script.contains("BigPizzaV3/Ad-List"));
+     assert!(
+         !script.contains("codexPlusAds = normalizeCodexPlusAds(await postJson(\"/ads\", {}));")
+     );
+@@ -1073,7 +1037,9 @@ fn injection_script_expands_api_key_plugin_marketplace_requests() {
+     assert!(script.contains("isCodexPluginBuildFlavorFilter"));
+     assert!(script.contains("!filtered.includes(plugin) : !callback(plugin)"));
+     assert!(script.contains("isCodexPluginMarketplaceHiddenFilter"));
+-    assert!(script.contains("!filtered.includes(marketplace) : !callback(marketplace)"));
++    assert!(script.contains(
++        "!filtered.includes(marketplace) : !callback(marketplace)"
++    ));
+     assert!(script.contains("plugin_marketplace_hidden_filter_bypassed"));
+     assert!(script.contains("method === \"list-plugins\""));
+     assert!(script.contains("method === \"vscode://codex/list-plugins\""));
+@@ -1108,11 +1074,9 @@ fn injection_script_expands_api_key_plugin_marketplace_requests() {
+     );
+     assert!(script.contains("restored === \"openai-api-curated\""));
+     assert!(script.contains("restored === \"openai-curated-remote\""));
+-    // 内置包的注册名已从 openai-curated-remote 换成 codex-plus-curated（前者是
+-    // codex 保留名会被静默忽略），显示名映射同时认新旧两个名字。
+-    assert!(script.contains(
+-        "if (name === \"codex-plus-curated\" || name === \"openai-curated-remote\") return \"OpenAI插件5(Codex++)\""
+-    ));
++    assert!(
++        script.contains("if (name === \"openai-curated-remote\") return \"OpenAI插件5(Codex++)\"")
++    );
+     assert!(script.contains(
+         "if (name === \"codex-plus-openai-curated-remote\") return \"openai-curated-remote\""
+     ));
+@@ -1411,9 +1375,9 @@ fn injection_script_keeps_session_action_buttons_in_pr_style() {
+
+     assert!(script.contains("actionButtonClass = \"codex-session-action-button\""));
+     assert!(script.contains("background: transparent;"));
+-    assert!(
+-        script.contains("background: var(--codex-session-action-hover-background, transparent);")
+-    );
++    assert!(script.contains(
++        "background: var(--codex-session-action-hover-background, transparent);"
++    ));
+     assert!(script.contains("cursor: default;"));
+ }
+

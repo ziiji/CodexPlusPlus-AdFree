@@ -1,0 +1,26 @@
+CHANGED BRANCH/FIELD: codex/v1.2.56-adfree; ad-free runtime paths plus release metadata synchronized to upstream v1.2.56.
+BASELINE command: git show upstream-v1.2.56:Cargo.toml | Select-String version; npm test; npm run check.
+BASELINE input: official upstream v1.2.56 tag (commit 696d3ef).
+BASELINE literal output/result: version = 1.2.56; npm test 118 passed, 0 failed; npm run check exit 0.
+BASELINE exit status: 0.
+MODIFIED command: npm test; npm run check; npm run vite:build; node --check assets/inject/renderer-inject.js; node tools/i18n-verify.mjs; git diff --check.
+MODIFIED input: upstream v1.2.56 with remote ad sources, sponsor UI, recommendation entry points, and promotional fields removed.
+MODIFIED literal output/result: npm test 118 passed, 0 failed; npm run check exit 0; vite build 1620 modules transformed and completed; i18n plain 985/985 and template 81/81; injected script syntax exit 0.
+MODIFIED exit status: 0.
+ROLLBACK command: Copy MODIFIED_FILE to another copy, replace version = 1.2.56 with version = 1.2.55.
+ROLLBACK input:
+C:\Users\phoenix\AppData\Local\Temp\codexpp-v1256-rollback-f9c38e69-4842-4617-bb3a-29db2607133f.toml
+.
+ROLLBACK literal output/result: ROLLBACK
+PASS
+; copied file reports version = 1.2.55.
+ROLLBACK exit status: 0.
+RESTORED behavior/status: rollback copy changed to 1.2.55; working tree and MODIFIED_FILE remain at 1.2.56.
+MODIFIED_FILE:
+D:\vibe coding\codexpp\artifacts\v1.2.56-adfree\MODIFIED_FILE
+DIFF_FILE:
+D:\vibe coding\codexpp\artifacts\v1.2.56-adfree\DIFF_FILE
+VERIFICATION.txt:
+D:\vibe coding\codexpp\artifacts\v1.2.56-adfree\VERIFICATION.txt
+ROLLBACK.sh:
+D:\vibe coding\codexpp\artifacts\v1.2.56-adfree\ROLLBACK.sh
